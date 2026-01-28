@@ -1,0 +1,25 @@
+# Database Configuration
+DATABASE_URL=postgresql://botdash_user:your_secure_password_here@localhost:5432/botdash
+
+# Telegram Bot Configuration
+BOT_TOKEN=your_telegram_bot_token_from_botfather
+BOT_USERNAME=your_bot_username_without_at
+
+# Admin Panel Configuration
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=change_this_secure_password
+ADMIN_JWT_SECRET=generate_long_random_string_here
+
+# Supabase Configuration (for file uploads)
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Application Configuration
+NODE_ENV=production
+PORT=3001
+
+# Optional Configuration
+DISABLE_TELEGRAM_AUTH=false
+
+# Frontend Environment (admin-panel/.env.local)
+NEXT_PUBLIC_API_URL=https://your-domain.com/api
