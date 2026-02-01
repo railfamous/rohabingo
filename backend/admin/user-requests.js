@@ -17,7 +17,7 @@ router.get('/', adminAuth, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT ur.*, tu.username, tu.first_name, tu.last_name
+      `SELECT ur.*, tu.username, tu.first_name, tu.last_name, tu.photo_url
        FROM user_requests ur
        JOIN telegram_users tu ON tu.id = ur.user_id
        ${where}

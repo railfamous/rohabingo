@@ -1457,27 +1457,23 @@ router.get('/dashboard-summary', adminAuth, async (req, res) => {
     const usersResult = await pool.query('SELECT COUNT(*) FROM telegram_users');
     const totalUsers = parseInt(usersResult.rows[0].count, 10);
 
-    // Active quizzes
-    const quizzesResult = await pool.query("SELECT COUNT(*) FROM tasks WHERE type = 'quiz' AND is_active = TRUE");
-    const activeQuizzes = parseInt(quizzesResult.rows[0].count, 10);
+    // Unread messages (inbox)
+    const unreadResult = await pool.query('SELECT COUNT(*) FROM conversations WHERE unread_count > 0');
+    const unreadMessages = parseInt(unreadResult.rows[0].count, 10);
 
-    // Video tasks (not disabled)
-    const videoTasksResult = await pool.query('SELECT COUNT(*) FROM youtube_tasks WHERE disabled = FALSE');
-    const videoTasks = parseInt(videoTasksResult.rows[0].count, 10);
+    // Open user requests
+    const requestsResult = await pool.query("SELECT COUNT(*) FROM user_requests WHERE status = 'open'");
+    const openRequests = parseInt(requestsResult.rows[0].count, 10);
 
-    // Total points (sum of all points from all sources)
-    const pointsResult = await pool.query(`
-      SELECT COALESCE(
-        (SELECT SUM(points) FROM telegram_users) +
-        (SELECT COALESCE(SUM(points_awarded), 0) FROM user_tasks) +
-        (SELECT COALESCE(SUM(points_awarded), 0) FROM referrals) +
-        (SELECT COALESCE(SUM(points_awarded), 0) FROM spins),
-        0
-      ) as total_points
-    `);
-    const totalPoints = parseInt(pointsResult.rows[0].total_points, 10);
+    // Active Flows
+    const flowsResult = await pool.query('SELECT COUNT(*) FROM flows');
+    const activeFlows = parseInt(flowsResult.rows[0].count, 10);
 
-    res.json({ totalUsers, activeQuizzes, videoTasks, totalPoints });
+    // Active Channels
+    const channelsResult = await pool.query('SELECT COUNT(*) FROM telegram_channels WHERE disabled = FALSE');
+    const activeChannels = parseInt(channelsResult.rows[0].count, 10);
+
+    res.json({ totalUsers, unreadMessages, openRequests, activeFlows, activeChannels });
   } catch (error) {
     console.error('Error fetching dashboard summary:', error);
     res.status(500).json({ message: 'Server error' });

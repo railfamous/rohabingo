@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { getDashboardSummary, DashboardSummary, getTopUsers, TopUser, getRecentActivities, RecentActivity } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
+import { Users, MessageSquare, HelpCircle, Workflow, Megaphone } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -34,157 +36,160 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const stats = [
+    {
+      label: 'Total Users',
+      value: summary?.totalUsers ?? '-',
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-100',
+      href: '/dashboard/users'
+    },
+    {
+      label: 'Unread Messages',
+      value: summary?.unreadMessages ?? '-',
+      icon: MessageSquare,
+      color: 'text-green-600',
+      bg: 'bg-green-100',
+      href: '/dashboard/inbox'
+    },
+    {
+      label: 'Open Requests',
+      value: summary?.openRequests ?? '-',
+      icon: HelpCircle,
+      color: 'text-orange-600',
+      bg: 'bg-orange-100',
+      href: '/dashboard/user-requests'
+    },
+    {
+      label: 'Active Flows',
+      value: summary?.activeFlows ?? '-',
+      icon: Workflow,
+      color: 'text-purple-600',
+      bg: 'bg-purple-100',
+      href: '/dashboard/flows'
+    },
+    {
+      label: 'Active Channels',
+      value: summary?.activeChannels ?? '-',
+      icon: Megaphone,
+      color: 'text-pink-600',
+      bg: 'bg-pink-100',
+      href: '/dashboard/channels'
+    }
+  ];
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Dashboard Overview</h1>
+    <div className="p-6 space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+        <p className="text-gray-500 mt-2">Overview of your bot's performance and activity.</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Stats Cards */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Users</p>
-              <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.totalUsers ?? '-'}</h3>
-            </div>
-            <div className="bg-blue-100 rounded-full p-3">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-blue-500"
-              >
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-green-600 text-sm font-medium mt-2">&nbsp;</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Active Quizzes</p>
-              <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.activeQuizzes ?? '-'}</h3>
-            </div>
-            <div className="bg-purple-100 rounded-full p-3">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-purple-500"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <path d="M12 17h.01" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-green-600 text-sm font-medium mt-2">&nbsp;</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Video Tasks</p>
-              <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.videoTasks ?? '-'}</h3>
-            </div>
-            <div className="bg-red-100 rounded-full p-3">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-red-500"
-              >
-                <polygon points="23 7 16 12 23 17 23 7" />
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-red-600 text-sm font-medium mt-2">&nbsp;</p>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {stats.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <Link key={i} href={stat.href} className="block transition-transform hover:scale-[1.02]">
+              <Card className="border-none shadow-sm hover:shadow-md transition-all h-full">
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+                    <h3 className="text-2xl font-bold mt-2 text-gray-900">
+                      {loading ? '...' : stat.value}
+                    </h3>
+                  </div>
+                  <div className={`p-3 rounded-full ${stat.bg}`}>
+                    <Icon className={`w-6 h-6 ${stat.color}`} />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Recent Activity</h2>
-          <div className="divide-y">
-            {activitiesLoading ? (
-              <div className="py-4 text-center text-gray-500">Loading...</div>
-            ) : activities.length > 0 ? activities.map((item, idx) => (
-              <div key={idx} className="py-3 flex justify-between items-center">
-                <div>
-                  <p className="font-medium text-gray-800">{item.first_name} {item.last_name} {item.username && <span className="text-gray-400 ml-1">@{item.username}</span>}</p>
-                  <p className="text-sm text-gray-500">{item.description} • {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}</p>
-                </div>
-              </div>
-            )) : (
-              <div className="py-4 text-center text-gray-500">No recent activity</div>
-            )}
-          </div>
-          <Link
-            href="/dashboard/activities"
-            className="text-blue-600 text-sm font-medium mt-4 hover:underline"
-          >
-            View all activity →
-          </Link>
-        </div>
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y">
+              {activitiesLoading ? (
+                <div className="py-8 text-center text-gray-400">Loading activities...</div>
+              ) : activities.length > 0 ? (
+                activities.map((item, idx) => (
+                  <div key={idx} className="py-4 flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                        {(item.first_name?.[0] || item.username?.[0] || 'U').toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">
+                          {item.first_name} {item.last_name}
+                          {item.username && <span className="text-gray-400 font-normal ml-1">@{item.username}</span>}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-gray-400">No recent activity</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Top Performing Users */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Top Performing Users</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
-                <tr>
-                  <th className="py-3 px-4 text-left text-gray-800">User</th>
-                  <th className="py-3 px-4 text-left text-gray-800">Tasks</th>
-                  <th className="py-3 px-4 text-left text-gray-800">Referrals</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {topUsersLoading ? (
-                  <tr><td colSpan={4} className="py-4 text-center text-gray-500">Loading...</td></tr>
-                ) : topUsers.length > 0 ? topUsers.map((user, idx) => (
-                  <tr key={user.id}>
-                    <td className="py-3 px-4 font-medium text-gray-800">
-                      {user.first_name} {user.last_name} {user.username && <span className="text-gray-400 ml-1">@{user.username}</span>}
-                    </td>
-                    <td className="py-3 px-4 text-gray-800">{user.completed_tasks_count}</td>
-                    <td className="py-3 px-4 text-gray-800">{user.referral_count}</td>
+        {/* Top Users */}
+        <Card className="border-none shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Top Users</CardTitle>
+            <Link href="/dashboard/users" className="text-sm text-blue-600 hover:underline">View All</Link>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-gray-500 text-left">
+                    <th className="pb-3 font-medium">User</th>
+                    <th className="pb-3 font-medium text-right">Tasks</th>
+                    <th className="pb-3 font-medium text-right">Referrals</th>
                   </tr>
-                )) : (
-                  <tr><td colSpan={4} className="py-4 text-center text-gray-500">No users found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <Link
-            href="/dashboard/users"
-            className="text-blue-600 text-sm font-medium mt-4 hover:underline"
-          >
-            View all users →
-          </Link>
-        </div>
+                </thead>
+                <tbody className="divide-y">
+                  {topUsersLoading ? (
+                    <tr><td colSpan={3} className="py-8 text-center text-gray-400">Loading users...</td></tr>
+                  ) : topUsers.length > 0 ? (
+                    topUsers.map((user) => (
+                      <tr key={user.id} className="group">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-bold">
+                              {(user.first_name?.[0] || 'U').toUpperCase()}
+                            </div>
+                            <div className="font-medium text-gray-900">
+                              {user.first_name} {user.last_name}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 text-right text-gray-600">{user.completed_tasks_count}</td>
+                        <td className="py-3 text-right text-gray-600">{user.referral_count}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={3} className="py-8 text-center text-gray-400">No users found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

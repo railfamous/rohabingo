@@ -160,8 +160,10 @@ export interface UserDetailResponse {
 
 export interface DashboardSummary {
   totalUsers: number;
-  activeQuizzes: number;
-  videoTasks: number;
+  unreadMessages: number;
+  openRequests: number;
+  activeFlows: number;
+  activeChannels: number;
 }
 
 
@@ -562,6 +564,7 @@ export interface UserRequest {
   username?: string;
   first_name?: string;
   last_name?: string;
+  photo_url?: string;
 }
 
 export interface SettingsResponse {
