@@ -54,6 +54,13 @@ export default function ModerationPage() {
   const [autoMuteDurationValue, setAutoMuteDurationValue] = useState('60');
   const [autoMuteDurationUnit, setAutoMuteDurationUnit] = useState<'seconds' | 'minutes' | 'hours'>('minutes');
 
+  // Link Deletion Config State
+  const [deleteLinkConfig, setDeleteLinkConfig] = useState<{
+    types: string[];
+    blocked_patterns: string[];
+    allowed_patterns: string[];
+  }>({ types: ['all'], blocked_patterns: [], allowed_patterns: [] });
+
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [botChats, setBotChats] = useState<BotChat[]>([]);
 
@@ -107,6 +114,9 @@ export default function ModerationPage() {
         setAutoMuteDurationValue(String(ui.value));
         setAutoMuteDurationUnit(ui.unit);
       }
+
+      // Parse delete_links_config (Global)
+      setDeleteLinkConfig(c.delete_links_config || { types: ['all'], blocked_patterns: [], allowed_patterns: [] });
 
       const [p, chats, perChat] = await Promise.all([getScheduledPosts(), getBotChats(), getModerationSettings()]);
       setPosts(p.posts || []);
@@ -162,6 +172,7 @@ export default function ModerationPage() {
       setAutoMuteDurationValue(String(ui.value));
       setAutoMuteDurationUnit(ui.unit);
     }
+    setDeleteLinkConfig(s.delete_links_config || { types: ['all'], blocked_patterns: [], allowed_patterns: [] });
   }, [modChatDest, modSettingsMap]);
 
   return (
@@ -317,6 +328,78 @@ export default function ModerationPage() {
                 <Switch checked={deleteLinks} onCheckedChange={setDeleteLinks} />
               </div>
 
+              {deleteLinks && (
+                <div className="pt-2 pl-2 space-y-4 border-l-2 border-blue-100 animate-in fade-in slide-in-from-top-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Link Types</Label>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="type-all"
+                            checked={deleteLinkConfig.types.includes('all')}
+                            onCheckedChange={(checked) => {
+                              setDeleteLinkConfig(prev => ({
+                                ...prev,
+                                types: checked ? ['all', ...prev.types.filter(t => t !== 'all')] : prev.types.filter(t => t !== 'all')
+                              }));
+                            }}
+                          />
+                          <Label htmlFor="type-all" className="cursor-pointer">Block All Links</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="type-telegram"
+                            checked={deleteLinkConfig.types.includes('telegram')}
+                            disabled={deleteLinkConfig.types.includes('all')}
+                            onCheckedChange={(checked) => {
+                              setDeleteLinkConfig(prev => ({
+                                ...prev,
+                                types: checked ? [...prev.types, 'telegram'] : prev.types.filter(t => t !== 'telegram')
+                              }));
+                            }}
+                          />
+                          <Label htmlFor="type-telegram" className="cursor-pointer">Block Telegram Links (t.me)</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="type-external"
+                            checked={deleteLinkConfig.types.includes('external')}
+                            disabled={deleteLinkConfig.types.includes('all')}
+                            onCheckedChange={(checked) => {
+                              setDeleteLinkConfig(prev => ({
+                                ...prev,
+                                types: checked ? [...prev.types, 'external'] : prev.types.filter(t => t !== 'external')
+                              }));
+                            }}
+                          />
+                          <Label htmlFor="type-external" className="cursor-pointer">Block External Links</Label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Blocked Patterns (Regex/String, one per line)</Label>
+                    <Textarea
+                      placeholder="example\.com&#10;badword"
+                      className="h-20 text-xs font-mono"
+                      value={deleteLinkConfig.blocked_patterns.join('\n')}
+                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, blocked_patterns: e.target.value.split('\n').filter(x => x.trim()) }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Allowed Patterns (Whitelist, one per line)</Label>
+                    <Textarea
+                      placeholder="google\.com&#10;goodsite"
+                      className="h-20 text-xs font-mono"
+                      value={deleteLinkConfig.allowed_patterns.join('\n')}
+                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, allowed_patterns: e.target.value.split('\n').filter(x => x.trim()) }))}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4 border-t pt-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -370,6 +453,7 @@ export default function ModerationPage() {
                     delete_links_enabled: deleteLinks,
                     auto_mute_enabled: autoMute,
                     auto_mute_seconds: clampedSeconds,
+                    delete_links_config: deleteLinkConfig
                   };
 
                   setLoading(true);

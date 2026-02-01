@@ -59,8 +59,16 @@ class TelegramBot {
 
       // Initialize standard Bot API client with polling
       this.bot = new TelegramBotApi(this.botToken, {
-        polling: true
+        polling: {
+          interval: 300,
+          autoStart: true,
+          params: {
+            timeout: 10,
+            allowed_updates: JSON.stringify(["message", "edited_message", "channel_post", "edited_channel_post", "callback_query", "my_chat_member", "chat_member", "chat_join_request"])
+          }
+        }
       });
+      logger.info('Configured polling with allowed_updates: message, channel_post, my_chat_member, chat_member...');
 
       // Try to detect and cache bot username so we don't require BOT_USERNAME env
       try {
@@ -137,6 +145,8 @@ class TelegramBot {
         const chatId = msg.chat.id;
         const chatType = msg.chat.type;
 
+        logger.info(`[handleChatActivity] Processing ${type} for chat ${chatId} (${chatType})`);
+
         if (!['group', 'supergroup', 'channel'].includes(chatType)) return;
 
         // Register chat so admin can see chat_id in the dashboard
@@ -196,18 +206,32 @@ class TelegramBot {
               welcome_text: row.welcome_text || '',
               delete_links_enabled: !!row.delete_links_enabled,
               auto_mute_enabled: !!row.auto_mute_enabled,
+              auto_mute_enabled: !!row.auto_mute_enabled,
               auto_mute_seconds: Number(row.auto_mute_seconds || 3600),
+              delete_links_config: row.delete_links_config || null
             }
             : globalSettings;
         } catch {
+          logger.error(`[handleChatActivity] Error resolving settings for ${chatId}`);
           return;
         }
 
-        if (!settings || settings.enabled === false) return;
+        logger.info(`[handleChatActivity] Settings for ${chatId}: enabled=${settings?.enabled}, welcome_enabled=${settings?.welcome_enabled}, type=${type}`);
 
-        // Welcome new members (Only for groups/supergroups)
-        // Channels do not generate "new_chat_members" service messages that bots can see in this way.
-        if (type === 'message' && settings.welcome_enabled && Array.isArray(msg.new_chat_members) && msg.new_chat_members.length > 0) {
+        if (!settings || settings.enabled === false) {
+          logger.info(`[handleChatActivity] Aborting: Moderation disabled for ${chatId}`);
+          return;
+        }
+
+        // Welcome new members 
+        // Support both standard 'message' (groups) and 'chat_member_join' (channels/groups)
+        const isWelcomeEvent = (type === 'message' && Array.isArray(msg.new_chat_members)) || type === 'chat_member_join';
+
+        if (isWelcomeEvent) {
+          logger.info(`[handleChatActivity] Welcome logic check: isWelcomeEvent=true, settings.welcome_enabled=${settings.welcome_enabled}, hasNewMembers=${Array.isArray(msg.new_chat_members)}, count=${msg.new_chat_members?.length}`);
+        }
+
+        if (isWelcomeEvent && settings.welcome_enabled && Array.isArray(msg.new_chat_members) && msg.new_chat_members.length > 0) {
           logger.info(`[Welcome] New members in chat ${chatId}: ${msg.new_chat_members.length}`);
           const text = String(settings.welcome_text || '').trim();
 
@@ -256,13 +280,62 @@ class TelegramBot {
         }
 
         // Delete any link (Works for both groups and channels if bot is admin)
-        if (settings.delete_links_enabled) {
-          const hasLinkEntity = Array.isArray(msg.entities)
-            ? msg.entities.some((e) => e.type === 'url' || e.type === 'text_link')
-            : false;
-          const textHasHttp = typeof msg.text === 'string' && /https?:\/\//i.test(msg.text);
-          const captionHasHttp = typeof msg.caption === 'string' && /https?:\/\//i.test(msg.caption);
-          const containsLink = hasLinkEntity || textHasHttp || captionHasHttp;
+        // Skip for chat_member_join as there is no message to delete
+        if (type !== 'chat_member_join' && settings.delete_links_enabled) {
+
+          const checkLinkConfig = (text, entities, config) => {
+            const hasAnyLink = (entities || []).some(e => e.type === 'url' || e.type === 'text_link') ||
+              /https?:\/\//i.test(text);
+
+            if (!hasAnyLink) return false;
+
+            // Default: Block all if no config
+            if (!config || !config.types || config.types.includes('all')) {
+              // Check whitelist patterns
+              if (config?.allowed_patterns?.length > 0) {
+                if (config.allowed_patterns.some(p => new RegExp(p, 'i').test(text))) return false;
+              }
+              return true;
+            }
+
+            let shouldDelete = false;
+
+            // Telegram links
+            const isTelegram = /t\.me\/|telegram\.me\//i.test(text);
+            if (config.types.includes('telegram') && isTelegram) shouldDelete = true;
+
+            // External links
+            if (config.types.includes('external') && !isTelegram) shouldDelete = true;
+
+            // Block specific patterns
+            if (config.blocked_patterns?.length > 0) {
+              if (config.blocked_patterns.some(p => new RegExp(p, 'i').test(text))) shouldDelete = true;
+            }
+
+            // Allow specific patterns (Override)
+            if (config.allowed_patterns?.length > 0) {
+              if (config.allowed_patterns.some(p => new RegExp(p, 'i').test(text))) shouldDelete = false;
+            }
+
+            return shouldDelete;
+          };
+
+          const config = settings.delete_links_config || null;
+          const text = msg.text || msg.caption || '';
+          // We pass concatenated text but logic might need refining if both exist. 
+          // Simple approach: check combined or primary text.
+
+          let containsLink = false;
+          if (config) {
+            containsLink = checkLinkConfig(text, msg.entities, config);
+          } else {
+            // Fallback: Block ALL logic
+            const hasLinkEntity = Array.isArray(msg.entities)
+              ? msg.entities.some((e) => e.type === 'url' || e.type === 'text_link')
+              : false;
+            const textHasHttp = /https?:\/\//i.test(text);
+            containsLink = hasLinkEntity || textHasHttp;
+          }
 
           if (containsLink && msg.message_id) {
             try {
@@ -325,6 +398,40 @@ class TelegramBot {
         }
       } catch (err) {
         logger.error('[my_chat_member] error', err);
+      }
+    });
+
+    // Listen to member updates (detects user joins in Groups AND Channels)
+    this.bot.on('chat_member', async (update) => {
+      try {
+        const chat = update.chat;
+        const newMember = update.new_chat_member;
+        const oldMember = update.old_chat_member;
+
+        logger.info(`[chat_member] Update for chat ${chat.id} (${chat.type}), user: ${newMember?.user?.id}, status: ${oldMember?.status} -> ${newMember?.status}`);
+
+        // Check if user joined (was not member -> is member/creator/administrator)
+        const isJoin =
+          ['left', 'kicked', 'restricted'].includes(oldMember?.status) || !oldMember ||
+          (oldMember.status === 'restricted' && !oldMember.is_member); // restricted non-member
+
+        const isNowMember = ['member', 'administrator', 'creator'].includes(newMember?.status);
+
+        if (isJoin && isNowMember && newMember.user && !newMember.user.is_bot) {
+          // Reuse handleChatActivity for welcome logic, mimicking a message structure
+          // We construct a fake 'message' object for compatibility
+          const fakeMsg = {
+            chat: chat,
+            from: newMember.user,
+            new_chat_members: [newMember.user],
+            date: Math.floor(Date.now() / 1000)
+          };
+          // Pass a special flag or just use 'message' type but we know it comes from update
+          // However, handleChatActivity checks 'type' arg. Let's pass 'chat_member_join'.
+          await handleChatActivity(fakeMsg, 'chat_member_join');
+        }
+      } catch (err) {
+        logger.error('[chat_member] error', err);
       }
     });
 

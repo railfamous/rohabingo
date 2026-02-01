@@ -94,6 +94,7 @@ router.put('/settings/:chatId', adminAuth, async (req, res) => {
       delete_links_enabled,
       auto_mute_enabled,
       auto_mute_seconds,
+      delete_links_config
     } = body;
 
     const r = await pool.query(
@@ -102,8 +103,9 @@ router.put('/settings/:chatId', adminAuth, async (req, res) => {
         welcome_enabled, welcome_text,
         delete_links_enabled,
         auto_mute_enabled, auto_mute_seconds,
+        delete_links_config,
         updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
       ON CONFLICT (chat_id) DO UPDATE SET
         chat_type=EXCLUDED.chat_type,
         enabled=EXCLUDED.enabled,
@@ -112,6 +114,7 @@ router.put('/settings/:chatId', adminAuth, async (req, res) => {
         delete_links_enabled=EXCLUDED.delete_links_enabled,
         auto_mute_enabled=EXCLUDED.auto_mute_enabled,
         auto_mute_seconds=EXCLUDED.auto_mute_seconds,
+        delete_links_config=EXCLUDED.delete_links_config,
         updated_at=NOW()
       RETURNING *`,
       [
@@ -123,6 +126,7 @@ router.put('/settings/:chatId', adminAuth, async (req, res) => {
         !!delete_links_enabled,
         !!auto_mute_enabled,
         Number(auto_mute_seconds || 3600),
+        body.delete_links_config || null
       ]
     );
 

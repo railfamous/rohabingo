@@ -186,6 +186,30 @@ export const getUserById = async (id: number): Promise<UserDetailResponse> => {
   return response.data;
 };
 
+export const setUserBanned = async (id: number, banned: boolean): Promise<any> => {
+  const response = await fetchWithAuth(`/admin/users/${id}/ban`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_banned: banned }),
+  });
+  return response.json();
+};
+
+export const setUserPremium = async (id: number, premium: boolean): Promise<any> => {
+  const response = await fetchWithAuth(`/admin/users/${id}/premium`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_premium: premium }),
+  });
+  return response.json();
+};
+
+export const updateUserPoints = async (id: number, points: number): Promise<any> => {
+  const response = await fetchWithAuth(`/admin/users/${id}/points`, {
+    method: 'PATCH',
+    body: JSON.stringify({ points }),
+  });
+  return response.json();
+};
+
 // Referrals API calls
 export const getReferrals = async (page = 1, limit = 10): Promise<ReferralsResponse> => {
   const response = await api.get(`/admin/referrals?page=${page}&limit=${limit}`);
@@ -637,6 +661,11 @@ export type ModerationSetting = {
   delete_links_enabled: boolean;
   auto_mute_enabled: boolean;
   auto_mute_seconds: number;
+  delete_links_config?: {
+    types: string[];
+    blocked_patterns: string[];
+    allowed_patterns: string[];
+  } | null;
 };
 
 export const getModerationSettings = async (): Promise<{ settings: ModerationSetting[] }> => {
