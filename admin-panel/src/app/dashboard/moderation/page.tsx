@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Shield, Clock, Plus, Trash2, Calendar, Image as ImageIcon, Video, UploadCloud, Loader2, Save, RefreshCw, CheckCircle2, ChevronsUpDown, Check } from 'lucide-react';
+import { Shield, Clock, Plus, Trash2, Calendar, Image as ImageIcon, Video, UploadCloud, Loader2, Save, RefreshCw, CheckCircle2, ChevronsUpDown, Check, Users, Megaphone } from 'lucide-react';
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -258,8 +258,16 @@ export default function ModerationPage() {
                                     checked={selectedChats.includes(val)}
                                     onCheckedChange={() => { }}
                                   />
+                                  {chat.chat_type === 'channel' ? (
+                                    <Megaphone className="w-4 h-4 text-blue-500 shrink-0" />
+                                  ) : (
+                                    <Users className="w-4 h-4 text-green-500 shrink-0" />
+                                  )}
                                   <span className="truncate">{chat.title || chat.username || chat.chat_id}</span>
-                                  {val === modChatDest && <span className="ml-auto text-xs text-blue-500 font-mono">EDITING</span>}
+                                  <span className="ml-auto text-[10px] text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded capitalize">
+                                    {chat.chat_type === 'supergroup' ? 'group' : chat.chat_type}
+                                  </span>
+                                  {val === modChatDest && <span className="text-[10px] text-blue-600 font-bold ml-1">EDITING</span>}
                                 </div>
                               </CommandItem>
                             );

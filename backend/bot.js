@@ -130,7 +130,8 @@ class TelegramBot {
     const pool = require('./config/database');
 
     // Welcome + delete links
-    this.bot.on('message', async (msg) => {
+    // Welcome + delete links
+    const handleChatActivity = async (msg, type = 'message') => {
       try {
         if (!msg?.chat?.id) return;
         const chatId = msg.chat.id;
@@ -204,8 +205,9 @@ class TelegramBot {
 
         if (!settings || settings.enabled === false) return;
 
-        // Welcome new members (send in group)
-        if (settings.welcome_enabled && Array.isArray(msg.new_chat_members) && msg.new_chat_members.length > 0) {
+        // Welcome new members (Only for groups/supergroups)
+        // Channels do not generate "new_chat_members" service messages that bots can see in this way.
+        if (type === 'message' && settings.welcome_enabled && Array.isArray(msg.new_chat_members) && msg.new_chat_members.length > 0) {
           logger.info(`[Welcome] New members in chat ${chatId}: ${msg.new_chat_members.length}`);
           const text = String(settings.welcome_text || '').trim();
 
@@ -253,7 +255,7 @@ class TelegramBot {
           }
         }
 
-        // Delete any link
+        // Delete any link (Works for both groups and channels if bot is admin)
         if (settings.delete_links_enabled) {
           const hasLinkEntity = Array.isArray(msg.entities)
             ? msg.entities.some((e) => e.type === 'url' || e.type === 'text_link')
@@ -262,14 +264,14 @@ class TelegramBot {
           const captionHasHttp = typeof msg.caption === 'string' && /https?:\/\//i.test(msg.caption);
           const containsLink = hasLinkEntity || textHasHttp || captionHasHttp;
 
-          if (containsLink && msg.message_id && msg.from) {
+          if (containsLink && msg.message_id) {
             try {
               await this.bot.deleteMessage(chatId, msg.message_id);
             } catch { }
 
-            if (settings.auto_mute_enabled) {
-              // Telegram may ignore/round very small until_date values.
-              // Enforce a minimum so the mute reliably expires.
+            // Auto-mute: Only valid for groups where we can restrict members.
+            // In channels, the poster is the channel itself or an admin, so we usually can't "restrict" them in the same way.
+            if ((chatType === 'group' || chatType === 'supergroup') && settings.auto_mute_enabled && msg.from) {
               const secondsRaw = Number(settings.auto_mute_seconds) || 3600;
               const seconds = Math.max(30, secondsRaw);
               try {
@@ -291,7 +293,39 @@ class TelegramBot {
             }
           }
         }
-      } catch { }
+      } catch { } // Error handler per-message
+    };
+
+    // Listen to standard group messages
+    this.bot.on('message', (msg) => handleChatActivity(msg, 'message'));
+
+    // Listen to channel posts (important for detecting channels!)
+    this.bot.on('channel_post', (msg) => handleChatActivity(msg, 'channel_post'));
+
+    // Listen to status updates (when bot is added to channel/group)
+    this.bot.on('my_chat_member', async (update) => {
+      try {
+        const chat = update.chat;
+        const status = update.new_chat_member.status;
+
+        // If bot is added or promoted, register the chat
+        if (['administrator', 'member', 'creator'].includes(status)) {
+          await pool.query(
+            `INSERT INTO bot_chats (chat_id, chat_type, title, username, last_seen_at, updated_at)
+             VALUES ($1,$2,$3,$4,NOW(),NOW())
+             ON CONFLICT (chat_id) DO UPDATE SET
+               chat_type=EXCLUDED.chat_type,
+               title=EXCLUDED.title,
+               username=EXCLUDED.username,
+               last_seen_at=NOW(),
+               updated_at=NOW()`,
+            [chat.id, chat.type, chat.title || null, chat.username || null]
+          );
+          logger.info(`[my_chat_member] Registered chat ${chat.id} (${chat.type})`);
+        }
+      } catch (err) {
+        logger.error('[my_chat_member] error', err);
+      }
     });
 
     // Scheduler: send due scheduled posts
