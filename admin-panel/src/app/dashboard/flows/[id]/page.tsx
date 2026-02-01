@@ -71,12 +71,19 @@ export default function FlowEditPage() {
   // Preview State
   const [previewNodeKey, setPreviewNodeKey] = useState<string | null>(null);
 
+  // Debugging logs
+  useEffect(() => {
+    console.log('FlowEditPage State:', { flow, versionsCount: versions.length, nodesCount: nodes.length, optionsCount: options.length, versionId: selectedVersionId });
+  }, [flow, versions, nodes, options, selectedVersionId]);
+
   const optionKeyToLabel = useMemo(() => {
     const m = new Map<string, string>();
-    for (const o of options || []) {
-      const k = String(o?.option_key || '').trim();
+    if (!Array.isArray(options)) return m;
+    for (const o of options) {
+      if (!o) continue;
+      const k = String(o.option_key || '').trim();
       if (!k) continue;
-      const label = String(o?.label_i18n?.en || '').trim();
+      const label = String(o.label_i18n?.en || '').trim();
       if (label) m.set(k, label);
     }
     return m;
@@ -84,10 +91,12 @@ export default function FlowEditPage() {
 
   const questionKeyToText = useMemo(() => {
     const m = new Map<string, string>();
-    for (const n of nodes || []) {
-      const k = String(n?.node_key || '').trim();
+    if (!Array.isArray(nodes)) return m;
+    for (const n of nodes) {
+      if (!n) continue;
+      const k = String(n.node_key || '').trim();
       if (!k) continue;
-      const t = String(n?.prompt_i18n?.en || '').trim();
+      const t = String(n.prompt_i18n?.en || '').trim();
       if (t) m.set(k, t);
     }
     return m;
@@ -104,17 +113,25 @@ export default function FlowEditPage() {
 
   const formatFlowErrorUi = (err: any) => {
     let msg = formatFlowError(err);
-    msg = msg.replace(/\bopt_\d+\b/gi, (k) => optionKeyToLabel.get(k) || k);
+    // Safety check for replace
+    try {
+      msg = msg.replace(/\bopt_\d+\b/gi, (k) => optionKeyToLabel.get(k) || k);
+    } catch (e) { console.error('Error formatting UI error:', e); }
     msg = appendQuestionContext(msg);
     return msg;
   };
 
   const [collapsedOptions, setCollapsedOptions] = useState<Record<string, boolean>>({});
 
-  const nodesById = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+  const nodesById = useMemo(() => {
+    if (!Array.isArray(nodes)) return new Map();
+    return new Map(nodes.filter(n => !!n).map(n => [n.id, n]));
+  }, [nodes]);
+
   // Helper to get ALL available nodes for dropdowns (including partials in state)
   const availableNodes = useMemo(() => {
-    return nodes.map(n => ({
+    if (!Array.isArray(nodes)) return [];
+    return nodes.filter(n => !!n).map(n => ({
       value: n.node_key,
       label: `${n.node_key} ${n.prompt_i18n?.en ? `- ${n.prompt_i18n.en.substring(0, 20)}...` : ''}`
     }));
@@ -123,7 +140,9 @@ export default function FlowEditPage() {
 
   const optionsByNodeId = useMemo(() => {
     const m = new Map<number, any[]>();
+    if (!Array.isArray(options)) return m;
     for (const o of options) {
+      if (!o || !o.flow_node_id) continue;
       const list = m.get(o.flow_node_id) || [];
       list.push(o);
       m.set(o.flow_node_id, list);
@@ -136,21 +155,35 @@ export default function FlowEditPage() {
   }, [options]);
 
   const loadFlow = async () => {
-    const data = await getFlow(flowId);
-    setFlow(data.flow);
-    setVersions(data.versions || []);
-    const first = (data.versions || [])[0];
-    if (first?.id) setSelectedVersionId(first.id);
+    try {
+      const data = await getFlow(flowId);
+      console.log('loadFlow data:', data);
+      setFlow(data.flow);
+      setVersions(Array.isArray(data.versions) ? data.versions : []);
+      const first = (data.versions || [])[0];
+      if (first?.id) setSelectedVersionId(first.id);
+    } catch (e) {
+      console.error('loadFlow error:', e);
+      throw e;
+    }
   };
 
   const loadVersion = async (versionId: number) => {
-    const data = await getFlowVersion(flowId, versionId);
-    setVersion(data.version);
-    setNodes(data.nodes || []);
-    setOptions(data.options || []);
-    // Set initial preview to start node if available
-    if (data.version?.start_node_key) {
-      setPreviewNodeKey(data.version.start_node_key);
+    try {
+      const data = await getFlowVersion(flowId, versionId);
+      console.log('loadVersion data:', data);
+      setVersion(data.version);
+      // Explicitly filter out any null/undefined nodes or options from backend
+      setNodes(Array.isArray(data.nodes) ? data.nodes.filter((n: any) => n) : []);
+      setOptions(Array.isArray(data.options) ? data.options.filter((o: any) => o) : []);
+
+      // Set initial preview to start node if available
+      if (data.version?.start_node_key) {
+        setPreviewNodeKey(data.version.start_node_key);
+      }
+    } catch (e) {
+      console.error('loadVersion error:', e);
+      throw e;
     }
   };
 
@@ -270,11 +303,16 @@ export default function FlowEditPage() {
 
   if (!flow) return <div className="p-8 text-center text-gray-500">Loading flow...</div>;
 
-  const previewNode = nodes.find(n => n.node_key === previewNodeKey) || nodes[0];
+  const validNodes = Array.isArray(nodes) ? nodes : [];
+  const validOptions = Array.isArray(options) ? options : [];
+
+  const previewNode = validNodes.find(n => n && n.node_key === previewNodeKey) || validNodes[0];
+
+  // Safe options retrieval
   const previewOptions = previewNode
     ? (previewNode.id
       ? (optionsByNodeId.get(previewNode.id) || [])
-      : options.filter(o => o.node_key === previewNode.node_key)
+      : validOptions.filter(o => o && o.node_key === previewNode.node_key)
     )
     : [];
 
@@ -304,7 +342,7 @@ export default function FlowEditPage() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
         {/* Left: Editor */}
         <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden h-full">
-          <ScrollArea className="h-full pr-4">
+          <div className="h-full overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             <div className="space-y-6 pb-20">
 
               {/* Start Node Config */}
@@ -340,12 +378,13 @@ export default function FlowEditPage() {
               </Card>
 
               {/* Nodes List */}
-              {nodes
+              {validNodes
                 .slice()
                 .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
                 .map((n, idx) => {
+                  if (!n) return null;
                   const isChoice = n.type === 'single_choice' || n.type === 'multi_choice';
-                  const optList = n.id ? (optionsByNodeId.get(n.id) || []) : options.filter((o) => o.node_key === n.node_key);
+                  const optList = n.id ? (optionsByNodeId.get(n.id) || []) : validOptions.filter((o) => o && o.node_key === n.node_key);
                   const isCollapsed = collapsedOptions[n.node_key] !== false;
                   const isPreviewing = previewNodeKey === n.node_key;
 
@@ -358,7 +397,10 @@ export default function FlowEditPage() {
                       <CardHeader className="py-3 px-4 bg-gray-50/50 border-b flex flex-row items-center justify-between cursor-pointer" >
                         <div className="flex items-center gap-3">
                           <div className="bg-white p-2 rounded-md border shadow-sm">
-                            {NODE_TYPES.find(t => t.value === n.type)?.icon({ className: "w-5 h-5 text-gray-500" }) || <MessageCircle className="w-5 h-5" />}
+                            {(() => {
+                              const TypeIcon = NODE_TYPES.find(t => t.value === n.type)?.icon || MessageCircle;
+                              return <TypeIcon className="w-5 h-5 text-gray-500" />;
+                            })()}
                           </div>
                           <div>
                             <div className="font-semibold text-sm flex items-center gap-2">
@@ -522,17 +564,22 @@ export default function FlowEditPage() {
               <Button
                 onClick={() => {
                   if (!selectedVersionId) return;
-                  const used = new Set(nodes.map((x) => String(x.node_key || '').toLowerCase()));
+                  // Safe filtering to prevent crashes
+                  const safeNodes = nodes.filter(n => n);
+                  const used = new Set(safeNodes.map((x) => String(x.node_key || '').toLowerCase()));
                   let i = 1;
                   while (used.has(`question_${i}`)) i += 1;
                   const nk = `question_${i}`;
-                  setNodes([...nodes, {
+
+                  const newNode = {
                     flow_version_id: selectedVersionId,
                     node_key: nk,
                     type: 'text',
                     prompt_i18n: { en: '' },
-                    sort_order: nodes.length
-                  }]);
+                    sort_order: safeNodes.length
+                  };
+
+                  setNodes([...safeNodes, newNode]);
                   setTimeout(() => setPreviewNodeKey(nk), 100);
                 }}
                 className="w-full py-6 border-dashed border-2 border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:border-gray-400"
@@ -541,7 +588,7 @@ export default function FlowEditPage() {
                 <Plus className="w-5 h-5 mr-2" /> Add New Question
               </Button>
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Right: Smartphone Preview */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle, ArrowUp, ArrowDown, Eye, EyeOff, Trash2, Plus, Image as ImageIcon, Video, Link as LinkIcon, Type } from 'lucide-react';
+import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle, ArrowUp, ArrowDown, Eye, EyeOff, Trash2, Plus, Image as ImageIcon, Video, Link as LinkIcon, Type, Workflow } from 'lucide-react';
 
 import { motion } from 'framer-motion';
 import {
@@ -19,7 +19,8 @@ import {
   WelcomeBlock,
   WelcomeBlockType,
   OnboardingQuestion,
-  OnboardingAnswer
+  OnboardingAnswer,
+  getFlows
 } from '@/lib/api';
 
 export default function SettingsPage() {
@@ -34,6 +35,7 @@ export default function SettingsPage() {
 
   // New Welcome Builder (ordered blocks)
   const [welcomeBlocks, setWelcomeBlocks] = useState<any[]>([]);
+  const [flows, setFlows] = useState<any[]>([]);
 
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestion[]>([]);
   const [onboardingAnswers, setOnboardingAnswers] = useState<OnboardingAnswer[]>([]);
@@ -55,6 +57,9 @@ export default function SettingsPage() {
       try {
         const wb = await getWelcomeBlocks();
         setWelcomeBlocks(wb.blocks || []);
+
+        const f = await getFlows();
+        setFlows(f.flows || []);
       } catch {
         // ignore if not configured
       }
@@ -265,6 +270,16 @@ export default function SettingsPage() {
                       <LinkIcon className="w-4 h-4 text-green-500" />
                       Link Button
                     </button>
+                    <button
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm flex items-center gap-2 text-gray-700"
+                      onClick={() => {
+                        const nextSort = (welcomeBlocks?.length || 0);
+                        setWelcomeBlocks([...(welcomeBlocks || []), { sort_order: nextSort, is_active: true, block_type: 'question_flow', payload: { slug: '' } }]);
+                      }}
+                    >
+                      <Workflow className="w-4 h-4 text-purple-500" />
+                      Flow
+                    </button>
                   </div>
                 </div>
               </div>
@@ -440,19 +455,23 @@ export default function SettingsPage() {
                     )}
 
                     {b.block_type === 'question_flow' && (
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                        <label className="block text-xs font-semibold text-blue-700 uppercase mb-1">Flow Slug</label>
-                        <input
-                          className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm"
+                      <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                        <label className="block text-xs font-semibold text-purple-700 uppercase mb-1">Trigger Flow</label>
+                        <select
+                          className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-white"
                           value={b.payload?.slug || ''}
                           onChange={(e) => {
                             const copy = [...(welcomeBlocks || [])];
                             copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), slug: e.target.value } };
                             setWelcomeBlocks(copy);
                           }}
-                          placeholder="e.g. onboarding_flow"
-                        />
-                        <p className="text-xs text-blue-600 mt-1">This flow will trigger after this block.</p>
+                        >
+                          <option value="">Select a flow...</option>
+                          {flows.map(f => (
+                            <option key={f.id} value={f.slug}>{f.title} ({f.slug})</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-purple-600 mt-1">Users will enter this flow.</p>
                       </div>
                     )}
                   </div>
@@ -526,6 +545,14 @@ export default function SettingsPage() {
                           {b.payload.title} ↗
                         </div>
                       )}
+
+                      {/* Flow Block */}
+                      {b.block_type === 'question_flow' && b.payload?.slug && (
+                        <div className="bg-purple-500/20 text-purple-300 p-2 rounded-xl max-w-[85%] text-xs border border-purple-500/30 flex items-center gap-2">
+                          <Workflow className="w-3 h-3" />
+                          <span>Triggers: <b>{flows.find(f => f.slug === b.payload.slug)?.title || b.payload.slug}</b></span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -541,155 +568,158 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* Onboarding Tab */}
-      {activeTab === 'onboarding' && (
-        <div className="grid gap-4">
-          <div className="p-4 rounded-lg bg-white shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-900">Create Onboarding Question</h3>
+      {
+        activeTab === 'onboarding' && (
+          <div className="grid gap-4">
+            <div className="p-4 rounded-lg bg-white shadow-sm border">
+              <h3 className="text-sm font-medium text-gray-900">Create Onboarding Question</h3>
 
-            <div className="grid gap-3 mt-3">
-              <div>
-                <label className="text-sm font-medium text-gray-900">Code</label>
-                <input
-                  className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                  value={newQuestionCode}
-                  onChange={(e) => setNewQuestionCode(e.target.value)}
-                  placeholder="profile_name"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-900">Type</label>
-                <select
-                  className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                  value={newQuestionType}
-                  onChange={(e) => setNewQuestionType(e.target.value as any)}
-                >
-                  <option value="text">Text</option>
-                  <option value="single_choice">Single choice</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-900">Question (English)</label>
-                <input
-                  className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                  value={newQuestionTextEn}
-                  onChange={(e) => setNewQuestionTextEn(e.target.value)}
-                  placeholder="What is your name?"
-                />
-              </div>
-
-              {newQuestionType === 'single_choice' && (
+              <div className="grid gap-3 mt-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-900">Options (one per line)</label>
-                  <p className="text-xs text-gray-500 mt-1">Format: key=Label (example: yes=Yes)</p>
-                  <textarea
-                    className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 font-mono text-sm"
-                    rows={5}
-                    value={newQuestionOptions}
-                    onChange={(e) => setNewQuestionOptions(e.target.value)}
-                    placeholder={'yes=Yes\nno=No'}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={newQuestionRequired} onChange={(e) => setNewQuestionRequired(e.target.checked)} />
-                  Required
-                </label>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Sort order</span>
+                  <label className="text-sm font-medium text-gray-900">Code</label>
                   <input
-                    type="number"
-                    className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                    value={newQuestionSortOrder}
-                    onChange={(e) => setNewQuestionSortOrder(parseInt(e.target.value || '0', 10))}
+                    className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                    value={newQuestionCode}
+                    onChange={(e) => setNewQuestionCode(e.target.value)}
+                    placeholder="profile_name"
                   />
                 </div>
-              </div>
 
-              <button
-                className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={async () => {
-                  try {
-                    const question_translations = { en: newQuestionTextEn };
-
-                    let options_translations: any = null;
-                    if (newQuestionType === 'single_choice') {
-                      const lines = newQuestionOptions.split('\n').map(l => l.trim()).filter(Boolean);
-                      const opts: Record<string, string> = {};
-                      for (const line of lines) {
-                        const idx = line.indexOf('=');
-                        if (idx === -1) continue;
-                        const key = line.slice(0, idx).trim();
-                        const label = line.slice(idx + 1).trim();
-                        if (key) opts[key] = label;
-                      }
-                      options_translations = { en: opts };
-                    }
-
-                    const payload: any = {
-                      code: newQuestionCode,
-                      is_active: true,
-                      trigger: 'on_start',
-                      type: newQuestionType,
-                      required: newQuestionRequired,
-                      sort_order: newQuestionSortOrder,
-                      question_translations,
-                      options_translations
-                    };
-
-                    const created = await createOnboardingQuestion(payload);
-                    setOnboardingQuestions([created.question, ...onboardingQuestions]);
-                    setMessage({ type: 'success', text: 'Question created' });
-                  } catch (e) {
-                    setMessage({ type: 'error', text: 'Failed to create question' });
-                  }
-                }}
-              >
-                Create
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-white shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-900">Questions</h3>
-            <div className="mt-3 grid gap-3">
-              {onboardingQuestions.map((q) => (
-                <div key={q.id} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">{q.code} (#{q.id})</div>
-                    <div className="flex gap-2">
-                      <button className="text-sm text-red-600" onClick={async () => {
-                        await deleteOnboardingQuestion(q.id);
-                        setOnboardingQuestions(onboardingQuestions.filter(x => x.id !== q.id));
-                      }}>Delete</button>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">type={q.type} active={String(q.is_active)} sort={q.sort_order}</div>
-                  <button className="mt-2 text-sm text-blue-600" onClick={async () => {
-                    await updateOnboardingQuestion(q.id, { is_active: !q.is_active });
-                    setOnboardingQuestions(onboardingQuestions.map(x => x.id === q.id ? { ...x, is_active: !x.is_active } : x));
-                  }}>Toggle Active</button>
+                <div>
+                  <label className="text-sm font-medium text-gray-900">Type</label>
+                  <select
+                    className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                    value={newQuestionType}
+                    onChange={(e) => setNewQuestionType(e.target.value as any)}
+                  >
+                    <option value="text">Text</option>
+                    <option value="single_choice">Single choice</option>
+                  </select>
                 </div>
-              ))}
+
+                <div>
+                  <label className="text-sm font-medium text-gray-900">Question (English)</label>
+                  <input
+                    className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                    value={newQuestionTextEn}
+                    onChange={(e) => setNewQuestionTextEn(e.target.value)}
+                    placeholder="What is your name?"
+                  />
+                </div>
+
+                {newQuestionType === 'single_choice' && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-900">Options (one per line)</label>
+                    <p className="text-xs text-gray-500 mt-1">Format: key=Label (example: yes=Yes)</p>
+                    <textarea
+                      className="w-full mt-2 px-3 py-2 rounded-lg border border-gray-300 font-mono text-sm"
+                      rows={5}
+                      value={newQuestionOptions}
+                      onChange={(e) => setNewQuestionOptions(e.target.value)}
+                      placeholder={'yes=Yes\nno=No'}
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={newQuestionRequired} onChange={(e) => setNewQuestionRequired(e.target.checked)} />
+                    Required
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Sort order</span>
+                    <input
+                      type="number"
+                      className="w-24 px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                      value={newQuestionSortOrder}
+                      onChange={(e) => setNewQuestionSortOrder(parseInt(e.target.value || '0', 10))}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
+                  onClick={async () => {
+                    try {
+                      const question_translations = { en: newQuestionTextEn };
+
+                      let options_translations: any = null;
+                      if (newQuestionType === 'single_choice') {
+                        const lines = newQuestionOptions.split('\n').map(l => l.trim()).filter(Boolean);
+                        const opts: Record<string, string> = {};
+                        for (const line of lines) {
+                          const idx = line.indexOf('=');
+                          if (idx === -1) continue;
+                          const key = line.slice(0, idx).trim();
+                          const label = line.slice(idx + 1).trim();
+                          if (key) opts[key] = label;
+                        }
+                        options_translations = { en: opts };
+                      }
+
+                      const payload: any = {
+                        code: newQuestionCode,
+                        is_active: true,
+                        trigger: 'on_start',
+                        type: newQuestionType,
+                        required: newQuestionRequired,
+                        sort_order: newQuestionSortOrder,
+                        question_translations,
+                        options_translations
+                      };
+
+                      const created = await createOnboardingQuestion(payload);
+                      setOnboardingQuestions([created.question, ...onboardingQuestions]);
+                      setMessage({ type: 'success', text: 'Question created' });
+                    } catch (e) {
+                      setMessage({ type: 'error', text: 'Failed to create question' });
+                    }
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white shadow-sm border">
+              <h3 className="text-sm font-medium text-gray-900">Questions</h3>
+              <div className="mt-3 grid gap-3">
+                {onboardingQuestions.map((q) => (
+                  <div key={q.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">{q.code} (#{q.id})</div>
+                      <div className="flex gap-2">
+                        <button className="text-sm text-red-600" onClick={async () => {
+                          await deleteOnboardingQuestion(q.id);
+                          setOnboardingQuestions(onboardingQuestions.filter(x => x.id !== q.id));
+                        }}>Delete</button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">type={q.type} active={String(q.is_active)} sort={q.sort_order}</div>
+                    <button className="mt-2 text-sm text-blue-600" onClick={async () => {
+                      await updateOnboardingQuestion(q.id, { is_active: !q.is_active });
+                      setOnboardingQuestions(onboardingQuestions.map(x => x.id === q.id ? { ...x, is_active: !x.is_active } : x));
+                    }}>Toggle Active</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white shadow-sm border">
+              <h3 className="text-sm font-medium text-gray-900">Latest Answers (max 500)</h3>
+              <div className="mt-3 text-xs text-gray-700 max-h-[28rem] overflow-auto">
+                <pre>{JSON.stringify(onboardingAnswers.slice(0, 50), null, 2)}</pre>
+              </div>
             </div>
           </div>
+        )
+      }
 
-          <div className="p-4 rounded-lg bg-white shadow-sm border">
-            <h3 className="text-sm font-medium text-gray-900">Latest Answers (max 500)</h3>
-            <div className="mt-3 text-xs text-gray-700 max-h-[28rem] overflow-auto">
-              <pre>{JSON.stringify(onboardingAnswers.slice(0, 50), null, 2)}</pre>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
+    </div >
   );
 }
