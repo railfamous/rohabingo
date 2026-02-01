@@ -567,6 +567,11 @@ export interface UserRequest {
   photo_url?: string;
 }
 
+export const getUserRequests = async (params?: { status?: 'open' | 'in_progress' | 'closed' | 'all', limit?: number }): Promise<{ requests: UserRequest[] }> => {
+  const response = await api.get('/admin/user-requests', { params });
+  return response.data;
+};
+
 export interface SettingsResponse {
   settings: Setting[];
 }

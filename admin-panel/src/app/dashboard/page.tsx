@@ -1,19 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getDashboardSummary, DashboardSummary, getTopUsers, TopUser, getRecentActivities, RecentActivity } from '@/lib/api';
+import { getDashboardSummary, DashboardSummary, getTopUsers, TopUser, getUserRequests, UserRequest } from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
-import { Users, MessageSquare, HelpCircle, Workflow, Megaphone } from 'lucide-react';
+import { Users, MessageSquare, HelpCircle, Workflow, Megaphone, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [topUsersLoading, setTopUsersLoading] = useState(true);
-  const [activities, setActivities] = useState<RecentActivity[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [requests, setRequests] = useState<UserRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -22,15 +23,18 @@ export default function DashboardPage() {
         setSummary(data);
         setLoading(false);
       }).catch(() => setLoading(false));
+
       getTopUsers(5).then(users => {
         setTopUsers(users);
         setTopUsersLoading(false);
       }).catch(() => setTopUsersLoading(false));
-      getRecentActivities(5).then(data => {
-        setActivities(data.activities);
-        setActivitiesLoading(false);
-      }).catch(() => setActivitiesLoading(false));
+
+      getUserRequests({ status: 'open', limit: 5 }).then(data => {
+        setRequests((data.requests || []).slice(0, 5));
+        setRequestsLoading(false);
+      }).catch(() => setRequestsLoading(false));
     };
+
     fetchAll();
     interval = setInterval(fetchAll, 10000); // Poll every 10 seconds
     return () => clearInterval(interval);
@@ -110,37 +114,55 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <Card className="border-none shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+        {/* Recent Open Requests */}
+        <Card className="border-none shadow-sm h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold text-gray-800">Recent Requests</CardTitle>
+            <Link href="/dashboard/user-requests" className="text-blue-600 hover:text-blue-700 flex items-center text-sm font-medium">
+              View All <ArrowRight className="ml-1 w-4 h-4" />
+            </Link>
           </CardHeader>
-          <CardContent>
-            <div className="divide-y">
-              {activitiesLoading ? (
-                <div className="py-8 text-center text-gray-400">Loading activities...</div>
-              ) : activities.length > 0 ? (
-                activities.map((item, idx) => (
-                  <div key={idx} className="py-4 flex items-center justify-between group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                        {(item.first_name?.[0] || item.username?.[0] || 'U').toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-gray-900">
-                          {item.first_name} {item.last_name}
-                          {item.username && <span className="text-gray-400 font-normal ml-1">@{item.username}</span>}
+          <CardContent className="flex-1">
+            <div className="space-y-4">
+              {requestsLoading ? (
+                <div className="py-8 text-center text-gray-400">Loading requests...</div>
+              ) : requests.length > 0 ? (
+                requests.map((req) => (
+                  <div key={req.id} className="flex items-start gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100">
+                    <Avatar className="w-10 h-10 border border-gray-200">
+                      <AvatarImage src={req.photo_url || undefined} />
+                      <AvatarFallback className="bg-orange-100 text-orange-600 font-bold">
+                        {(req.first_name?.[0] || req.username?.[0] || 'U').toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {req.first_name} {req.last_name}
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap bg-gray-100 px-2 py-0.5 rounded-full">
+                          {formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 line-clamp-2 leading-snug">
+                        {req.message}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{req.source}</span>
+                        {req.payload && (
+                          <span className="text-[10px] text-gray-400 font-mono bg-gray-50 px-1 rounded">
+                            {JSON.stringify(req.payload).slice(0, 20)}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                      {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                    </span>
                   </div>
                 ))
               ) : (
-                <div className="py-8 text-center text-gray-400">No recent activity</div>
+                <div className="py-12 text-center flex flex-col items-center justify-center text-gray-400 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                  <HelpCircle className="w-8 h-8 opacity-20 mb-2" />
+                  <p>No open requests</p>
+                </div>
               )}
             </div>
           </CardContent>
