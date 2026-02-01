@@ -30,20 +30,19 @@ type NavItem = {
 
 // Navigation items for sidebar
 const navItems: NavItem[] = [
+  // Main dashboard and user items
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Users', href: '/dashboard/users', icon: Users, showCount: 'active' },
+
   // Primary communication & flow items
   { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox },
   { name: 'User Requests', href: '/dashboard/user-requests', icon: FileQuestion, showCount: 'pending' },
   { name: 'Flows', href: '/dashboard/flows', icon: Workflow },
 
-  // Settings entry (moved above Dashboard)
+  // Settings entry
   { name: 'Welcome Messages', href: '/dashboard/settings', icon: MessageSquareQuote },
   { name: 'Broadcast', href: '/dashboard/broadcast', icon: Megaphone },
   { name: 'Group/Channel', href: '/dashboard/moderation', icon: Radio },
-
-  // Main dashboard and task items
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-
-  { name: 'Users', href: '/dashboard/users', icon: Users, showCount: 'active' },
 ];
 
 export default function Sidebar() {
