@@ -14,10 +14,19 @@ import {
   ScheduledPost,
   uploadFile,
 } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { Shield, Clock, Plus, Trash2, Calendar, Image as ImageIcon, Video, UploadCloud, Loader2, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function ModerationPage() {
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Destination for moderation settings (per chat)
   const [modChatDest, setModChatDest] = useState('');
@@ -35,10 +44,9 @@ export default function ModerationPage() {
   const [autoMuteDurationUnit, setAutoMuteDurationUnit] = useState<'seconds' | 'minutes' | 'hours'>('minutes');
 
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
-
   const [botChats, setBotChats] = useState<BotChat[]>([]);
 
-  // Schedule form (choose destination, no manual chat_id)
+  // Schedule form
   const [scheduleDest, setScheduleDest] = useState('');
   const [scheduleType, setScheduleType] = useState<'text' | 'photo' | 'video'>('text');
   const [scheduleText, setScheduleText] = useState('');
@@ -46,7 +54,7 @@ export default function ModerationPage() {
   const [scheduleMediaUrl, setScheduleMediaUrl] = useState('');
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
-  // HTML datetime-local uses: "YYYY-MM-DDTHH:mm" (local time)
+
   const [scheduleAt, setScheduleAt] = useState('');
 
   const secondsToUi = (secs: number) => {
@@ -58,7 +66,6 @@ export default function ModerationPage() {
   };
 
   const parseNonNegativeInt = (raw: string) => {
-    // Allow empty while editing.
     if (raw.trim() === '') return 0;
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0) return 0;
@@ -78,7 +85,6 @@ export default function ModerationPage() {
       const g = await getGlobalModeration();
       const c = g.config || {};
 
-      // Global defaults (used if a chat doesn't have per-chat override yet)
       setEnabled(c.enabled !== false);
       setWelcomeEnabled(!!c.welcome_enabled);
       setWelcomeText(String(c.welcome_text || ''));
@@ -102,13 +108,12 @@ export default function ModerationPage() {
       for (const s of perChat.settings || []) m[Number(s.chat_id)] = s;
       setModSettingsMap(m);
 
-      // Pick first chat by default
       if (!modChatDest && filteredChats.length > 0) {
         const c0 = filteredChats[0];
         setModChatDest(`${c0.chat_id}:${c0.chat_type}`);
       }
     } catch (e: any) {
-      setMsg({ type: 'error', text: e?.response?.data?.message || e?.message || 'Failed to load' });
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -119,7 +124,6 @@ export default function ModerationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When destination chat changes, load its override (or fall back to global values in state).
   useEffect(() => {
     if (!modChatDest) return;
     const [chatIdRaw] = modChatDest.split(':');
@@ -127,7 +131,11 @@ export default function ModerationPage() {
     if (!chatId) return;
 
     const s = modSettingsMap[chatId];
-    if (!s) return;
+    if (!s) {
+      // Reset to defaults or keep current globals if no specific settings found?
+      // Actually good UX is to keep the "Global Defaults" visible if no override exists.
+      return;
+    }
 
     setEnabled(s.enabled !== false);
     setWelcomeEnabled(!!s.welcome_enabled);
@@ -144,102 +152,138 @@ export default function ModerationPage() {
   }, [modChatDest, modSettingsMap]);
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">Group / Channel Management</h1>
-      <p className="text-sm text-gray-500 mt-1">Choose a destination chat to enable/disable moderation and configure rules for that chat.</p>
-
-      {msg && (
-        <div className={`mt-4 p-3 rounded ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          {msg.text}
+    <div className="p-6 max-w-6xl mx-auto space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Group & Channel Management</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Configure moderation rules and schedule posts for your communities.
+          </p>
         </div>
-      )}
+        <Button variant="outline" onClick={load} disabled={loading} size="sm">
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </Button>
+      </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="p-4 rounded-lg bg-white shadow-sm border">
-          <h2 className="font-semibold">Moderation Settings</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          <div className="grid gap-2 mt-3">
-            <select className="px-3 py-2 border rounded" value={modChatDest} onChange={(e) => setModChatDest(e.target.value)}>
-              <option value="">Select destination…</option>
-              {botChats.map((c) => {
-                const label = c.title || (c.username ? `@${c.username}` : `${c.chat_type} ${c.chat_id}`);
-                const value = `${c.chat_id}:${c.chat_type}`;
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-              Enable moderation (selected chat)
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={welcomeEnabled} onChange={(e) => setWelcomeEnabled(e.target.checked)} />
-              Welcome new members (send in group)
-            </label>
-            <textarea className="px-3 py-2 border rounded" rows={3} value={welcomeText} onChange={(e) => setWelcomeText(e.target.value)} placeholder="Welcome text (HTML allowed)" />
-
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={deleteLinks} onChange={(e) => setDeleteLinks(e.target.checked)} />
-              Delete any link
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={autoMute} onChange={(e) => setAutoMute(e.target.checked)} />
-              Auto-mute user who posts link
-            </label>
-            <div className="grid gap-1">
-              <div className="flex gap-2">
-                <input
-                  className="px-3 py-2 border rounded w-40"
-                  type="number"
-                  min={0}
-                  value={autoMuteDurationValue}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    // Remove leading zeros like 01 -> 1 (but keep single 0)
-                    const normalized = raw.replace(/^0+(?=\d)/, '');
-                    setAutoMuteDurationValue(normalized);
-                    setAutoMuteSeconds(uiToSeconds(normalized, autoMuteDurationUnit));
-                  }}
-                  placeholder="Duration"
-                />
-                <select
-                  className="px-3 py-2 border rounded"
-                  value={autoMuteDurationUnit}
-                  onChange={(e) => {
-                    const u = e.target.value as any;
-                    setAutoMuteDurationUnit(u);
-                    setAutoMuteSeconds(uiToSeconds(autoMuteDurationValue, u));
-                  }}
-                >
-                  <option value="seconds">seconds</option>
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                </select>
+        {/* Moderation Column */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-600">
+                <Shield className="w-5 h-5" />
+                Moderation Rules
+              </CardTitle>
+              <CardDescription>
+                Set rules for a specific group or channel.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Destination Chat</Label>
+                <Select value={modChatDest} onValueChange={setModChatDest}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a chat..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {botChats.length === 0 && <SelectItem value="none" disabled>No groups found</SelectItem>}
+                    {botChats.map((c) => (
+                      <SelectItem key={c.chat_id} value={`${c.chat_id}:${c.chat_type}`}>
+                        {c.title || c.username || c.chat_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">The bot must be an Admin in the chat to enforce these rules.</p>
               </div>
-              <div className="text-xs text-gray-500">Minimum auto-mute is 30 seconds (smaller values may not expire on Telegram).</div>
-            </div>
 
-            <button
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-              onClick={async () => {
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="space-y-0.5">
+                  <Label>Enable Moderation</Label>
+                  <div className="text-xs text-muted-foreground">Master switch for this chat</div>
+                </div>
+                <Switch checked={enabled} onCheckedChange={setEnabled} />
+              </div>
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="space-y-0.5">
+                  <Label>Welcome New Members</Label>
+                  <div className="text-xs text-muted-foreground">Send a message when users join</div>
+                </div>
+                <Switch checked={welcomeEnabled} onCheckedChange={setWelcomeEnabled} />
+              </div>
+
+              {welcomeEnabled && (
+                <div className="pt-2 animate-in fade-in slide-in-from-top-2">
+                  <Label className="mb-2 block">Welcome Message (HTML supported)</Label>
+                  <Textarea
+                    value={welcomeText}
+                    onChange={(e) => setWelcomeText(e.target.value)}
+                    rows={3}
+                    placeholder="Welcome <b>{name}</b> to our group!"
+                    className="font-mono text-sm"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="space-y-0.5">
+                  <Label>Delete Links</Label>
+                  <div className="text-xs text-muted-foreground">Remove messages containing URLs</div>
+                </div>
+                <Switch checked={deleteLinks} onCheckedChange={setDeleteLinks} />
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Auto-Mute Sender</Label>
+                    <div className="text-xs text-muted-foreground">Mute users who post links</div>
+                  </div>
+                  <Switch checked={autoMute} onCheckedChange={setAutoMute} />
+                </div>
+
+                {autoMute && (
+                  <div className="flex items-end gap-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex-1">
+                      <Label className="mb-1.5 block text-xs">Duration Value</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={autoMuteDurationValue}
+                        onChange={(e) => setAutoMuteDurationValue(e.target.value)}
+                      />
+                    </div>
+                    <div className="w-[120px]">
+                      <Label className="mb-1.5 block text-xs">Unit</Label>
+                      <Select value={autoMuteDurationUnit} onValueChange={(v: any) => setAutoMuteDurationUnit(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="seconds">Seconds</SelectItem>
+                          <SelectItem value="minutes">Minutes</SelectItem>
+                          <SelectItem value="hours">Hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Button className="w-full mt-4" onClick={async () => {
                 try {
-                  if (!modChatDest) return setMsg({ type: 'error', text: 'Select destination chat first' });
-
+                  if (!modChatDest) { toast.error('Select a chat first'); return; }
                   const [chatIdRaw, chatTypeRaw] = modChatDest.split(':');
                   const chatId = Number(chatIdRaw);
-                  const chatType = (chatTypeRaw || 'group') as any;
-                  if (!chatId) return setMsg({ type: 'error', text: 'Invalid destination chat' });
 
                   const seconds = uiToSeconds(autoMuteDurationValue, autoMuteDurationUnit);
                   const clampedSeconds = autoMute ? Math.max(30, seconds) : seconds;
 
                   const r = await upsertModerationSetting(chatId, {
-                    chat_type: chatType,
+                    chat_type: chatTypeRaw as any,
                     enabled,
                     welcome_enabled: welcomeEnabled,
                     welcome_text: welcomeText,
@@ -248,187 +292,191 @@ export default function ModerationPage() {
                     auto_mute_seconds: clampedSeconds,
                   });
 
-                  // Keep UI consistent with what was saved
-                  if (autoMute && clampedSeconds !== seconds) {
-                    const ui = secondsToUi(clampedSeconds);
-                    setAutoMuteDurationValue(String(ui.value));
-                    setAutoMuteDurationUnit(ui.unit);
-                    setAutoMuteSeconds(clampedSeconds);
-                  }
-
                   setModSettingsMap((prev) => ({ ...prev, [chatId]: r.setting }));
-                  setMsg({ type: 'success', text: 'Saved for selected chat' });
-                } catch (e: any) {
-                  setMsg({ type: 'error', text: e?.response?.data?.message || e?.message || 'Save failed' });
+                  toast.success('Rules saved successfully');
+                } catch {
+                  toast.error('Failed to save rules');
                 }
-              }}
-            >
-              Save
-            </button>
-          </div>
-
-          <div className="mt-4 text-xs text-gray-500">
-            Note: bot must be admin in the group/channel to delete messages or mute users.
-          </div>
+              }}>
+                <Save className="w-4 h-4 mr-2" />
+                Save Rules
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="p-4 rounded-lg bg-white shadow-sm border">
-          <h2 className="font-semibold">Scheduled Posts</h2>
-          <div className="text-xs text-gray-500 mt-1">Select a destination chat where the bot is admin.</div>
-
-          <div className="grid gap-2 mt-3">
-            <select className="px-3 py-2 border rounded" value={scheduleDest} onChange={(e) => setScheduleDest(e.target.value)}>
-              <option value="">Select destination…</option>
-              {botChats.map((c) => {
-                const label = c.title || (c.username ? `@${c.username}` : `${c.chat_type} ${c.chat_id}`);
-                const value = `${c.chat_id}:${c.chat_type}`;
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-            <select
-              className="px-3 py-2 border rounded"
-              value={scheduleType}
-              onChange={(e) => {
-                const v = e.target.value as any;
-                setScheduleType(v);
-                if (v === 'text') setScheduleMediaUrl('');
-              }}
-            >
-              <option value="text">text</option>
-              <option value="photo">photo</option>
-              <option value="video">video</option>
-            </select>
-            <textarea className="px-3 py-2 border rounded" rows={3} value={scheduleText} onChange={(e) => setScheduleText(e.target.value)} placeholder="Text / Caption" />
-
-            {(scheduleType === 'photo' || scheduleType === 'video') && (
-              <div className="grid gap-2">
-                {/* Hidden input: Upload button triggers this */}
-                <input
-                  ref={mediaFileInputRef}
-                  type="file"
-                  hidden
-                  accept={scheduleType === 'photo' ? 'image/*' : 'video/*'}
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    // allow selecting same file again later
-                    e.target.value = '';
-                    if (!f) return;
-                    try {
-                      setUploadingMedia(true);
-                      const r = await uploadFile(f, 'scheduled-posts');
-                      setScheduleMediaUrl(r.url);
-                      setMsg({ type: 'success', text: 'Media uploaded successfully.' });
-                    } catch (err: any) {
-                      setMsg({ type: 'error', text: err?.message || 'Upload failed' });
-                    } finally {
-                      setUploadingMedia(false);
-                    }
-                  }}
-                />
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded border"
-                    disabled={uploadingMedia}
-                    onClick={() => mediaFileInputRef.current?.click()}
-                  >
-                    {uploadingMedia ? 'Uploading…' : 'Upload'}
-                  </button>
-
-                  <input
-                    className="flex-1 px-3 py-2 border rounded"
-                    value={scheduleMediaUrl}
-                    onChange={(e) => setScheduleMediaUrl(e.target.value)}
-                    placeholder="Or paste Media URL"
-                  />
-                </div>
-
-                {scheduleMediaUrl && <div className="text-xs text-gray-500">Using: {scheduleMediaUrl}</div>}
+        {/* Scheduling Column */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-600">
+                <Clock className="w-5 h-5" />
+                Schedule Post
+              </CardTitle>
+              <CardDescription>
+                Queue content to be sent automatically.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Destination</Label>
+                <Select value={scheduleDest} onValueChange={setScheduleDest}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select destination..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {botChats.map((c) => (
+                      <SelectItem key={c.chat_id} value={`${c.chat_id}:${c.chat_type}`}>
+                        {c.title || c.username || c.chat_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            <input
-              type="datetime-local"
-              className="px-3 py-2 border rounded"
-              value={scheduleAt}
-              onChange={(e) => setScheduleAt(e.target.value)}
-            />
+              <div className="space-y-2">
+                <Label>Content Type</Label>
+                <Select value={scheduleType} onValueChange={(v: any) => setScheduleType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text Only</SelectItem>
+                    <SelectItem value="photo">Photo</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <button
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-              disabled={uploadingMedia}
-              onClick={async () => {
+              <div className="space-y-2">
+                <Label>Message / Caption</Label>
+                <Textarea
+                  value={scheduleText}
+                  onChange={(e) => setScheduleText(e.target.value)}
+                  placeholder="What's happening?"
+                  rows={3}
+                />
+              </div>
+
+              {(scheduleType !== 'text') && (
+                <div className="p-3 bg-gray-50 border rounded-lg space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Input
+                      value={scheduleMediaUrl}
+                      onChange={(e) => setScheduleMediaUrl(e.target.value)}
+                      placeholder="Media URL or Upload"
+                      className="bg-white"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={() => mediaFileInputRef.current?.click()}
+                      disabled={uploadingMedia}
+                    >
+                      {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                    </Button>
+                    <input
+                      ref={mediaFileInputRef}
+                      type="file"
+                      hidden
+                      accept={scheduleType === 'photo' ? "image/*" : "video/*"}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        try {
+                          setUploadingMedia(true);
+                          const r = await uploadFile(f, 'scheduled');
+                          setScheduleMediaUrl(r.url);
+                          toast.success('Uploaded!');
+                        } catch {
+                          toast.error('Upload failed');
+                        } finally {
+                          setUploadingMedia(false);
+                        }
+                      }}
+                    />
+                  </div>
+                  {scheduleMediaUrl && (
+                    <div className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Ready
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Send At (Local Time)</Label>
+                <Input
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                />
+              </div>
+
+              <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={async () => {
                 try {
-                  if (!scheduleDest) return setMsg({ type: 'error', text: 'Destination chat required' });
-                  if (!scheduleAt) return setMsg({ type: 'error', text: 'Send time required' });
-
+                  if (!scheduleDest) { toast.error('Select destination'); return; }
+                  if (!scheduleAt) { toast.error('Select time'); return; }
                   const [chatIdRaw, chatTypeRaw] = scheduleDest.split(':');
-                  const chatId = Number(chatIdRaw);
-                  const chatType = (chatTypeRaw || 'group') as any;
-                  if (!chatId) return setMsg({ type: 'error', text: 'Invalid destination chat' });
-
-                  // Convert local datetime-local input into an ISO timestamp for the backend.
-                  const sendAtDate = new Date(scheduleAt);
-                  if (Number.isNaN(sendAtDate.getTime())) return setMsg({ type: 'error', text: 'Invalid send time' });
-                  const sendAtIso = sendAtDate.toISOString();
-
-                  if ((scheduleType === 'photo' || scheduleType === 'video') && !scheduleMediaUrl) {
-                    return setMsg({ type: 'error', text: 'Please upload a file (Upload button) or paste a Media URL.' });
-                  }
 
                   await createScheduledPost({
-                    chat_id: chatId,
-                    chat_type: chatType,
+                    chat_id: Number(chatIdRaw),
+                    chat_type: chatTypeRaw as any,
                     content_type: scheduleType,
                     text: scheduleText,
-                    media_url: scheduleMediaUrl || undefined,
-                    send_at: sendAtIso,
+                    media_url: scheduleMediaUrl,
+                    send_at: new Date(scheduleAt).toISOString()
                   });
-                  setMsg({ type: 'success', text: 'Scheduled' });
-                  await load();
-                } catch (e: any) {
-                  setMsg({ type: 'error', text: e?.response?.data?.message || e?.message || 'Schedule failed' });
+                  toast.success('Post scheduled!');
+                  load();
+                  setScheduleText('');
+                  setScheduleMediaUrl('');
+                  setScheduleAt('');
+                } catch {
+                  toast.error('Failed to schedule post');
                 }
-              }}
-            >
-              Create Schedule
-            </button>
-          </div>
+              }}>
+                <Calendar className="w-4 h-4 mr-2" />
+                Schedule Post
+              </Button>
+            </CardContent>
+          </Card>
 
-          <div className="mt-4">
-            <h3 className="font-medium">Jobs</h3>
-            <div className="mt-2 space-y-2 text-sm">
-              {posts.map((p) => (
-                <div key={p.id} className="border rounded p-2">
-                  <div className="font-medium">#{p.id} → {p.chat_id} ({p.chat_type}) [{p.status}]</div>
-                  <div className="text-xs">{p.content_type} | {p.send_at}</div>
-                  {p.error && <div className="text-xs text-red-600">{p.error}</div>}
-                  <button
-                    className="mt-2 px-3 py-1 border rounded text-red-600"
-                    onClick={async () => {
-                      await deleteScheduledPost(p.id);
-                      await load();
-                    }}
-                  >
-                    Delete
-                  </button>
+          {/* Jobs List */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-gray-700">Scheduled Jobs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {posts.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">No pending posts</div>
+              ) : (
+                <div className="space-y-3">
+                  {posts.map(p => (
+                    <div key={p.id} className="flex items-start justify-between p-3 border rounded-lg bg-gray-50/50">
+                      <div className="space-y-1">
+                        <div className="text-xs font-semibold text-gray-700">
+                          To: {p.chat_id}
+                          <span className="ml-1 px-1.5 py-0.5 bg-gray-200 rounded text-[10px] text-gray-600">{p.chat_type}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {format(new Date(p.send_at), 'MMM d, h:mm a')}
+                        </div>
+                        {p.error && <div className="text-xs text-red-500 mt-1">Error: {p.error}</div>}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={async () => {
+                        await deleteScheduledPost(p.id);
+                        load();
+                      }}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {posts.length === 0 && <div className="text-xs text-gray-400">No jobs yet.</div>}
-            </div>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </div>
-
-      <div className="mt-4">
-        <button className="px-4 py-2 rounded border" onClick={load} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
       </div>
     </div>
   );
