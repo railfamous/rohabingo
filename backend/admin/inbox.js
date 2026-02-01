@@ -31,6 +31,9 @@ router.get('/conversations/:id/messages', adminAuth, async (req, res) => {
     const conversationId = parseInt(req.params.id, 10);
     const limit = Math.min(parseInt(req.query.limit || '100', 10) || 100, 500);
 
+    // Reset unread count
+    await pool.query('UPDATE conversations SET unread_count = 0 WHERE id = $1', [conversationId]);
+
     const conv = await pool.query('SELECT * FROM conversations WHERE id = $1', [conversationId]);
     if (!conv.rows.length) return res.status(404).json({ message: 'Conversation not found' });
 
@@ -138,14 +141,16 @@ router.post('/conversations/:id/reply', adminAuth, async (req, res) => {
 
     if (hasMedia) {
       const caption = hasText ? String(text) : undefined;
-      if (media_type === 'photo') sent = await botInstance.bot.sendPhoto(chatId, media_url, { ...opts, caption });
-      else if (media_type === 'video') sent = await botInstance.bot.sendVideo(chatId, media_url, { ...opts, caption });
-      else if (media_type === 'audio') sent = await botInstance.bot.sendAudio(chatId, media_url, { ...opts, caption });
-      else if (media_type === 'voice') sent = await botInstance.bot.sendVoice(chatId, media_url, { ...opts, caption });
-      else if (media_type === 'document') sent = await botInstance.bot.sendDocument(chatId, media_url, { ...opts, caption });
+      const mediaOpts = { ...opts, caption, __skip_db_logging: true };
+
+      if (media_type === 'photo') sent = await botInstance.bot.sendPhoto(chatId, media_url, mediaOpts);
+      else if (media_type === 'video') sent = await botInstance.bot.sendVideo(chatId, media_url, mediaOpts);
+      else if (media_type === 'audio') sent = await botInstance.bot.sendAudio(chatId, media_url, mediaOpts);
+      else if (media_type === 'voice') sent = await botInstance.bot.sendVoice(chatId, media_url, mediaOpts);
+      else if (media_type === 'document') sent = await botInstance.bot.sendDocument(chatId, media_url, mediaOpts);
       else return res.status(400).json({ message: 'Unsupported media_type. Use photo|video|audio|voice|document' });
     } else {
-      sent = await botInstance.bot.sendMessage(chatId, String(text), opts);
+      sent = await botInstance.bot.sendMessage(chatId, String(text), { ...opts, __skip_db_logging: true });
     }
 
     // Best-effort: update the reserved row with Telegram IDs.

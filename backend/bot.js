@@ -836,13 +836,17 @@ class TelegramBot {
         ? String(info.text).trim().slice(0, 280)
         : (info.type ? `[${info.type}]` : '[message]');
 
+      // Increment unread count only for inbound messages (from user to bot)
+      const unreadIncrement = direction === 'inbound' ? 1 : 0;
+
       await pool.query(
         `UPDATE conversations
          SET last_message_at = NOW(),
              last_message_preview = $2,
+             unread_count = unread_count + $3,
              updated_at = NOW()
          WHERE id = $1`,
-        [conversation.id, preview]
+        [conversation.id, preview, unreadIncrement]
       );
     } catch (e) {
       // Logging must never crash bot
@@ -860,6 +864,20 @@ class TelegramBot {
 
       this.bot[methodName] = async (...args) => {
         const chatId = args && args.length > 0 ? args[0] : null;
+        // Check for special flag in options (usually the last argument, or second to last for some methods)
+        let options = {};
+        if (args.length > 1 && typeof args[args.length - 1] === 'object') {
+          options = args[args.length - 1] || {};
+        }
+
+        // If this flag is present, the caller (Admin API) has already logged the message to DB.
+        // We should skip duplicate logging here to prevent deadlocks and double entries.
+        if (options && options.__skip_db_logging === true) {
+          // Remove the internal flag before sending to Telegram (just in case, though they ignore extra fields)
+          delete options.__skip_db_logging;
+          return original.apply(this.bot, args);
+        }
+
         try {
           const sent = await original.apply(this.bot, args);
           // Log outbound using the returned Telegram message object

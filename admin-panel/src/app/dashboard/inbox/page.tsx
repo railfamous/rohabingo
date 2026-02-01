@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { uploadFile } from '@/lib/api';
 import api from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Search, Send, Paperclip, Loader2, Image as ImageIcon, FileText, CheckCheck, MoreVertical, X } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 type Conversation = {
   id: number;
@@ -11,6 +20,7 @@ type Conversation = {
   status: string;
   last_message_at: string | null;
   last_message_preview: string | null;
+  unread_count: number;
   created_at: string;
   updated_at: string;
   username?: string;
@@ -40,20 +50,20 @@ type ConversationMessage = {
 export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const sendingRef = useRef(false);
-  const sendQueueRef = useRef<
-    Array<{
-      conversationId: number;
-      text: string;
-      hasMedia: boolean;
-      mediaType: string;
-      url: string;
-      mediaFileName: string;
-      sig: string;
-      optimisticId: number;
-    }>
-  >([]);
+  const sendQueueRef = useRef<Array<{
+    conversationId: number;
+    text: string;
+    hasMedia: boolean;
+    mediaType: string;
+    url: string;
+    mediaFileName: string;
+    replyToId?: number | null;
+    sig: string;
+    optimisticId: number;
+  }>>([]);
   const lastSendRef = useRef<{ sig: string; at: number } | null>(null);
   const cooldownUntilRef = useRef<number>(0);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,18 +71,41 @@ export default function InboxPage() {
   const [mediaType, setMediaType] = useState<string>('');
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [mediaFileName, setMediaFileName] = useState<string>('');
+  const [replyTo, setReplyTo] = useState<ConversationMessage | null>(null);
   const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const selectedIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const selectedConversation = useMemo(
     () => conversations.find(c => c.id === selectedId) || null,
     [conversations, selectedId]
   );
 
+  const filteredConversations = useMemo(() => {
+    if (!searchTerm) return conversations;
+    const lower = searchTerm.toLowerCase();
+    return conversations.filter(c =>
+      (c.username && c.username.toLowerCase().includes(lower)) ||
+      (c.first_name && c.first_name.toLowerCase().includes(lower)) ||
+      (c.last_name && c.last_name.toLowerCase().includes(lower)) ||
+      String(c.telegram_chat_id).includes(lower)
+    );
+  }, [conversations, searchTerm]);
+
   const loadConversations = async () => {
-    const res = await api.get('/admin/inbox/conversations?limit=100');
-    setConversations(res.data.conversations || []);
+    try {
+      const res = await api.get('/admin/inbox/conversations?limit=100');
+      setConversations(res.data.conversations || []);
+    } catch {
+      // silent fail
+    }
   };
 
   const loadMessages = async (conversationId: number, opts?: { silent?: boolean }) => {
@@ -82,7 +115,11 @@ export default function InboxPage() {
       const res = await api.get(`/admin/inbox/conversations/${conversationId}/messages?limit=500`);
       const incoming: ConversationMessage[] = res.data.messages || [];
 
-      // Merge by id for this conversation to avoid flicker and preserve optimistic messages.
+      // Update unread count locally for this conversation
+      setConversations(prev => prev.map(c =>
+        c.id === conversationId ? { ...c, unread_count: 0 } : c
+      ));
+
       setMessages((prev) => {
         const prevSame = prev.filter((m) => m.conversation_id === conversationId);
         const byId = new Map<any, ConversationMessage>();
@@ -95,6 +132,8 @@ export default function InboxPage() {
           return (a.id || 0) - (b.id || 0);
         });
       });
+    } catch {
+      toast.error('Failed to load messages');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -112,18 +151,14 @@ export default function InboxPage() {
     loadMessages(selectedId);
   }, [selectedId]);
 
-  // Auto-refresh messages for the selected conversation so new user messages appear
   useEffect(() => {
     if (!selectedId) return;
-
     const interval = setInterval(() => {
       loadMessages(selectedId, { silent: true });
     }, 5000);
-
     return () => clearInterval(interval);
   }, [selectedId]);
 
-  // Auto-scroll to the latest message when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -131,14 +166,20 @@ export default function InboxPage() {
   }, [messages, selectedId]);
 
   const handleUpload = async (file: File) => {
-    const up = await uploadFile(file, 'inbox');
-    setMediaUrl(up.url);
-    setMediaFileName(file.name || '');
+    try {
+      const up = await uploadFile(file, 'inbox');
+      setMediaUrl(up.url);
+      setMediaFileName(file.name || '');
 
-    if (file.type.startsWith('image/')) setMediaType('photo');
-    else if (file.type.startsWith('video/')) setMediaType('video');
-    else if (file.type.startsWith('audio/')) setMediaType('audio');
-    else setMediaType('document');
+      if (file.type.startsWith('image/')) setMediaType('photo');
+      else if (file.type.startsWith('video/')) setMediaType('video');
+      else if (file.type.startsWith('audio/')) setMediaType('audio');
+      else setMediaType('document');
+
+      toast.success('File attached');
+    } catch {
+      toast.error('Upload failed');
+    }
   };
 
   const processSendQueue = async () => {
@@ -154,39 +195,44 @@ export default function InboxPage() {
 
       try {
         const idempotencyKey = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
         await api.post(`/admin/inbox/conversations/${job.conversationId}/reply`, {
           text: job.text ? job.text : undefined,
           media_type: job.hasMedia ? job.mediaType : undefined,
           media_url: job.hasMedia ? job.url : undefined,
           parse_mode: 'HTML',
+          reply_to_message_id: job.replyToId,
           idempotency_key: idempotencyKey,
         });
 
         lastSendRef.current = { sig: job.sig, at: Date.now() };
         cooldownUntilRef.current = Date.now() + 300;
-      } catch (err) {
-        // Remove optimistic message for failed job
+
+        // Refresh conversations to update last message preview
+        void loadConversations();
+
+        // Fix duplicate messages:
+        // 1. Fetch real messages (if active)
+        if (selectedIdRef.current === job.conversationId) {
+          await loadMessages(job.conversationId, { silent: true });
+        }
+        // 2. Remove optimistic message
         setMessages((prev) => prev.filter((m) => m.id !== job.optimisticId));
-        console.error('Failed to send reply', err);
+
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== job.optimisticId));
+        toast.error('Failed to send message');
       }
     }
 
     setSending(false);
     sendingRef.current = false;
-
-    // Refresh conversations list (for preview/last_message_at) but do NOT reload messages.
-    // Messages are already appended optimistically; reloading can cause UI jumps/flicker.
-    void loadConversations();
   };
 
-  const sendReply = async (e?: MouseEvent<HTMLButtonElement>) => {
+  const sendReply = async (e?: MouseEvent<HTMLButtonElement> | React.FormEvent) => {
     e?.preventDefault();
-    e?.stopPropagation();
-
     if (!selectedConversation) return;
 
-    // Small cooldown to avoid accidental double-click spam
+    // Reduced cooldown (0.5s) to prevent accidental double-clicks but allow fast chatting
     if (Date.now() < cooldownUntilRef.current) return;
 
     const text = replyText.trim();
@@ -196,17 +242,19 @@ export default function InboxPage() {
 
     const sig = `${selectedConversation.id}::${text}::${hasMedia ? `${mediaType}:${url}` : ''}`;
     const last = lastSendRef.current;
-    if (last && last.sig === sig && Date.now() - last.at < 2500) return;
 
-    // Optimistic message
+    // Duplicate check: only block if exact same content sent < 1s ago
+    if (last && last.sig === sig && Date.now() - last.at < 1000) return;
+
     const optimisticId = -Date.now();
     const nowIso = new Date().toISOString();
-    const optimisticMessage: ConversationMessage = {
+
+    setMessages((prev) => [...prev, {
       id: optimisticId,
       conversation_id: selectedConversation.id,
       direction: 'outbound',
       telegram_message_id: null,
-      telegram_reply_to_message_id: null,
+      telegram_reply_to_message_id: replyTo ? replyTo.telegram_message_id : null,
       sender_telegram_user_id: null,
       type: hasMedia ? mediaType || 'media' : 'text',
       text: text || null,
@@ -216,17 +264,10 @@ export default function InboxPage() {
       mime_type: null,
       file_size: null,
       media_duration: null,
-      payload: hasMedia
-        ? {
-            media_type: mediaType,
-            media_url: url,
-          }
-        : null,
+      payload: hasMedia ? { media_type: mediaType, media_url: url } : null,
       created_at: nowIso,
-    };
-    setMessages((prev) => [...prev, optimisticMessage]);
+    }]);
 
-    // Enqueue send job
     sendQueueRef.current.push({
       conversationId: selectedConversation.id,
       text,
@@ -234,207 +275,265 @@ export default function InboxPage() {
       mediaType,
       url,
       mediaFileName,
+      replyToId: replyTo ? replyTo.telegram_message_id : undefined,
       sig,
       optimisticId,
     });
 
-    // Clear composer immediately so admin can type next message
+    // Reset input immediately
     setReplyText('');
     setMediaType('');
     setMediaUrl('');
     setMediaFileName('');
+    setReplyTo(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
 
-    // Process queue in background
+    // Focus management is automatic since input has autoFocus but let's be safe
+    // Note: In React, state updates might cause loss of focus if component re-renders fully.
+
     void processSendQueue();
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inbox</h1>
+    <div className="flex h-[calc(100vh-8rem)] overflow-hidden bg-gray-50/50 m-4 rounded-xl border shadow-sm">
+      {/* Sidebar List */}
+      <div className="w-80 border-r bg-white flex flex-col">
+        <div className="p-4 border-b space-y-3">
+          <h1 className="text-xl font-semibold tracking-tight">Messages</h1>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Search conversations..."
+              className="pl-9 bg-gray-50 border-gray-200"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Conversations list */}
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="p-3 border-b font-medium">users</div>
-          <div className="max-h-[70vh] overflow-auto">
-            {conversations.map((c) => {
+        <ScrollArea className="flex-1">
+          <div className="flex flex-col">
+            {filteredConversations.map((c) => {
               const name = c.username
                 ? `@${c.username}`
-                : [c.first_name, c.last_name].filter(Boolean).join(' ') || `Chat ${c.telegram_chat_id}`;
+                : [c.first_name, c.last_name].filter(Boolean).join(' ') || `User ${c.telegram_chat_id}`;
+              const initials = (name.slice(0, 2)).toUpperCase();
 
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
-                  className={`w-full text-left p-3 border-b hover:bg-gray-50 ${selectedId === c.id ? 'bg-gray-50' : ''}`}
+                  className={`flex items-start gap-3 p-4 text-left transition-colors border-b border-dashed border-gray-100 last:border-0 hover:bg-gray-50/80
+                    ${selectedId === c.id ? 'bg-blue-50/50 hover:bg-blue-50' : ''}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium text-sm text-gray-900 truncate">{name}</div>
-                    <div className="text-xs text-gray-400">{c.last_message_at ? new Date(c.last_message_at).toLocaleString() : ''}</div>
+                  <Avatar className="h-10 w-10 border relative">
+                    <AvatarFallback className="text-xs bg-blue-100 text-blue-700">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`font-medium text-sm truncate ${selectedId === c.id ? 'text-blue-900' : 'text-gray-900'}`}>
+                        {name}
+                      </span>
+                      <span className="text-[10px] text-gray-400 shrink-0 ml-2">
+                        {c.last_message_at ? format(new Date(c.last_message_at), 'MMM d') : ''}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className={`text-xs truncate max-w-[180px] ${selectedId === c.id ? 'text-blue-600/80' : 'text-gray-500'}`}>
+                        {c.last_message_preview || 'No messages'}
+                      </p>
+                      {c.unread_count > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full font-bold shadow-sm">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 truncate">{c.last_message_preview || ''}</div>
                 </button>
               );
             })}
 
-            {conversations.length === 0 && (
-              <div className="p-4 text-sm text-gray-500">No conversations yet.</div>
-            )}
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div className="bg-white border rounded-xl overflow-hidden lg:col-span-2 flex flex-col h-[70vh]">
-          <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50/60">
-            {selectedConversation ? (
-              <div>
-                <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <span>
-                    {selectedConversation.username
-                      ? `@${selectedConversation.username}`
-                      : [selectedConversation.first_name, selectedConversation.last_name]
-                          .filter(Boolean)
-                          .join(' ') || `Chat ${selectedConversation.telegram_chat_id}`}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500">
-                  Chat ID: {selectedConversation.telegram_chat_id}
-                </div>
+            {filteredConversations.length === 0 && (
+              <div className="p-8 text-center text-sm text-gray-500">
+                No conversations found.
               </div>
-            ) : (
-              <span className="text-sm text-gray-500">Select a conversation to start chatting</span>
             )}
           </div>
+        </ScrollArea>
+      </div>
 
-          {/* Messages list */}
-          <div className="flex-1 px-4 py-3 overflow-auto space-y-3 bg-gray-50">
-            {loading && <div className="text-xs text-gray-400">Loading…</div>}
-
-            {selectedConversation && messages.length === 0 && !loading && (
-              <div className="text-sm text-gray-500">No messages yet.</div>
-            )}
-
-            {messages
-              .filter((m) => !selectedConversation || m.conversation_id === selectedConversation.id)
-              .map((m) => {
-              const isOutbound = m.direction === 'outbound';
-              return (
-                <div
-                  key={m.id}
-                  className={`flex w-full ${isOutbound ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xl rounded-2xl px-3 py-2 shadow-sm border text-sm whitespace-pre-wrap break-words
-                      ${isOutbound
-                        ? 'bg-blue-600 text-white border-blue-600 rounded-br-md'
-                        : 'bg-white text-gray-900 border-gray-200 rounded-bl-md'}`}
-                  >
-                    {m.text && (
-                      <div className={`text-sm leading-relaxed ${isOutbound ? 'text-white' : 'text-gray-900'}`}>
-                        {m.text}
-                      </div>
-                    )}
-
-                    {(m.file_id || m.file_name) && (
-                      <div className={`mt-2 text-[11px] ${isOutbound ? 'text-blue-100/90' : 'text-gray-500'}`}>
-                        {m.file_name && (
-                          <div>file_name: <span className="font-medium">{m.file_name}</span></div>
-                        )}
-                        {m.file_id && (
-                          <div className="break-all font-mono opacity-80">file_id: {m.file_id}</div>
-                        )}
-                      </div>
-                    )}
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col bg-gray-50/30">
+        {selectedConversation ? (
+          <>
+            {/* Header */}
+            <div className="h-16 border-b bg-white flex items-center justify-between px-6 shrink-0">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9 border">
+                  <AvatarFallback className="bg-purple-100 text-purple-700">
+                    {selectedConversation.username?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">
+                    {selectedConversation.username ? `@${selectedConversation.username}` : `User ${selectedConversation.telegram_chat_id}`}
+                  </h2>
+                  <div className="text-xs text-green-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    Active
                   </div>
                 </div>
-              );
-            })}
-
-            {/* Scroll anchor */}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Reply composer */}
-          <div className="border-t bg-white/80 backdrop-blur-sm px-4 py-3">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                rows={2}
-                placeholder="Type a message…"
-                className="flex-1 w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 disabled:bg-gray-100 resize-none"
-                disabled={!selectedConversation}
-              />
-
-              {/* Attach button with icon */}
-              <div className="flex flex-col items-center gap-1 text-[10px] text-gray-500">
-                <label className="inline-flex items-center justify-center w-9 h-9 rounded-full border bg-gray-50 hover:bg-gray-100 cursor-pointer">
-                  <svg
-                    className="w-4 h-4 text-gray-600"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24L9.88 16.24a1 1 0 0 1-1.41-1.41L15.54 7.76" />
-                  </svg>
-                  <input
-                    type="file"
-                    className="hidden"
-                    ref={fileInputRef}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleUpload(f);
-                    }}
-                    disabled={!selectedConversation}
-                  />
-                </label>
-                {mediaUrl && (() => {
-                  const derivedFromUrl = mediaUrl.split('/').pop() || '';
-                  const cleanFromUrl = derivedFromUrl.split('?')[0];
-                  const baseName = mediaFileName || cleanFromUrl;
-                  const label = baseName
-                    ? `${baseName}${mediaType ? ` (${mediaType})` : ''}`
-                    : (mediaType || 'media');
-
-                  return (
-                    <span className="max-w-[8rem] truncate" title={baseName || mediaUrl}>
-                      {label}
-                    </span>
-                  );
-                })()}
               </div>
-
-              {/* Send button with icon */}
-              <button
-                type="button"
-                onClick={sendReply}
-                disabled={!selectedConversation || (!replyText.trim() && !mediaUrl.trim())}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white shadow-sm hover:bg-blue-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className={`w-4 h-4 ${sending ? 'opacity-70' : ''}`}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
+              <Button variant="ghost" size="icon" className="text-gray-400">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
             </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 min-h-0">
+              <div className="space-y-4 max-w-3xl mx-auto pb-4">
+                {loading && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  </div>
+                )}
+
+                {messages.length === 0 && !loading && (
+                  <div className="text-center py-10 text-sm text-gray-400">
+                    No messages in this conversation yet.
+                  </div>
+                )}
+
+                {messages.map((m) => {
+                  const isOutbound = m.direction === 'outbound';
+                  return (
+                    <div key={m.id} className="group relative">
+                      <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+                        <div className="flex items-end gap-2 max-w-[85%]">
+                          {/* Reply Button (visible on hover) */}
+                          <button
+                            onClick={() => setReplyTo(m)}
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-gray-200 text-gray-400
+                              ${isOutbound ? 'order-first mr-1' : 'order-last ml-1'}`}
+                            title="Reply"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-reply"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+                          </button>
+
+                          <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm border
+                            ${isOutbound
+                              ? 'bg-blue-600 text-white border-blue-600 rounded-br-none'
+                              : 'bg-white text-gray-800 border-gray-200 rounded-bl-none'
+                            }
+                          `}>
+                            {/* Reply Context in Message Bubble */}
+                            {m.telegram_reply_to_message_id && (
+                              <div className={`mb-2 pl-2 border-l-2 text-xs opacity-75 ${isOutbound ? 'border-white/50' : 'border-blue-500'}`}>
+                                <div className="font-semibold">Replying...</div>
+                              </div>
+                            )}
+
+                            {m.text && <div className="leading-relaxed whitespace-pre-wrap break-words">{m.text}</div>}
+
+                            {(m.file_id || m.file_name || m.payload?.media_url) && (
+                              <div className={`mt-2 p-2 rounded bg-black/10 flex items-center gap-2 text-xs font-medium`}>
+                                {m.type === 'photo' ? <ImageIcon className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                                <span className="truncate max-w-[150px]">
+                                  {m.file_name || m.file_unique_id || 'Attachment'}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className={`text-[10px] mt-1 text-right opacity-70 flex items-center justify-end gap-1`}>
+                              {format(new Date(m.created_at), 'h:mm a')}
+                              {isOutbound && <CheckCheck className="w-3 h-3" />}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            {/* Composer */}
+            <div className="p-4 bg-white border-t">
+              <div className="max-w-3xl mx-auto">
+                {/* Reply Banner */}
+                {replyTo && (
+                  <div className="mb-2 flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg border-l-4 border-blue-500 animate-in slide-in-from-bottom-2">
+                    <div className="flex flex-col text-sm">
+                      <span className="font-semibold text-blue-600">Replying to {replyTo.direction === 'outbound' ? 'You' : (selectedConversation.first_name || 'User')}</span>
+                      <span className="text-gray-500 truncate max-w-md">{replyTo.text || '[Attachment]'}</span>
+                    </div>
+                    <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-gray-200 rounded-full">
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                )}
+
+                {mediaUrl && (
+                  <div className="mb-2 inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-md text-xs font-medium border border-blue-100 animate-in slide-in-from-bottom-2">
+                    <Paperclip className="w-3 h-3" />
+                    {mediaFileName || 'Attachment'}
+                    <button onClick={() => { setMediaUrl(''); setMediaFileName(''); }} className="ml-1 hover:bg-blue-100 rounded-full p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                <form
+                  className="flex items-end gap-2"
+                  onSubmit={(e) => { e.preventDefault(); sendReply(); }}
+                >
+                  <div className="flex-1 relative">
+                    <Input
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Type your message..."
+                      className="pr-10 py-6"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400 hover:text-gray-600"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleUpload(f);
+                      }}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={(!replyText && !mediaUrl)}
+                    className="h-12 w-12 rounded-xl shrink-0"
+                  >
+                    <Send className="w-5 h-5" />
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <Send className="w-8 h-8 text-gray-300" />
+            </div>
+            <p>Select a conversation to start messaging</p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
