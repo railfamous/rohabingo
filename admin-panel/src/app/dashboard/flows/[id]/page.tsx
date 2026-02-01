@@ -610,62 +610,114 @@ export default function FlowEditPage() {
                 </div>
 
                 {/* Chat Area */}
-                <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-[url('https://telegram.org/file/464001088/1/bO-E-8y8B1I.73359/17f8d6899e3f890289')] bg-cover bg-center bg-gray-900/90 bg-blend-overlay">
-                  {!previewNode ? (
-                    <div className="flex h-full items-center justify-center text-gray-500 text-xs italic">
-                      Select a question to preview
-                    </div>
-                  ) : (
-                    <>
-                      {/* Incoming Message Bubble */}
-                      <div className="flex items-end gap-2 max-w-[90%]">
-                        <div className="w-6 h-6 rounded-full bg-blue-500 shrink-0 mb-1"></div>
-                        <div className="bg-[#182533] p-3 rounded-2xl rounded-bl-sm shadow-sm border border-gray-800 backdrop-blur-sm">
-                          <div className="text-[13px] leading-relaxed whitespace-pre-wrap">
-                            {previewNode.prompt_i18n?.en || '...'}
-                          </div>
-                          <div className="text-[9px] text-gray-500 text-right mt-1">12:00 PM</div>
-                        </div>
-                      </div>
+                <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-[#0e1621]">
+                  {(() => {
+                    // Path Finding Logic
+                    // 1. Build Adjacency Map for reverse lookup if needed, or just forward
+                    // Actually, easiest is BFS from Start Node to Preview Node.
 
-                      {/* Buttons / Input Preview */}
-                      <div className="mt-4">
-                        {previewNode.type === 'text' && (
-                          <div className="bg-[#17212b] p-2 rounded-t-xl opacity-50 border-t border-gray-700">
-                            <div className="text-xs text-gray-400 px-2 italic">User types reply...</div>
-                          </div>
-                        )}
+                    if (!previewNode || !version?.start_node_key) {
+                      if (!previewNode) return <div className="text-gray-500 text-xs text-center mt-10">Select a question</div>;
+                    }
 
-                        {(previewNode.type === 'single_choice' || previewNode.type === 'multi_choice') && (
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {(previewOptions || []).map((o: any) => (
-                              <div key={o.option_key || 'new'} className="bg-[#2b5278] hover:bg-[#34628e] text-white py-2 px-4 rounded-md text-xs font-medium cursor-default shadow-sm transition-colors border-b-2 border-[#1e3a56]">
-                                {o.label_i18n?.en || 'Option'}
+                    // Reverse Path Lookup Strategy
+                    // This is more robust for disconnected graphs or when start node isn't set.
+                    const getReversePath = (targetKey: string): any[] => {
+                      const parentMap = new Map<string, string>(); // child -> parent
+
+                      validNodes.forEach(n => {
+                        // Direct link
+                        if (n.next_node_key) {
+                          parentMap.set(n.next_node_key, n.node_key);
+                        }
+                        // Option links
+                        const opts = n.id
+                          ? (optionsByNodeId.get(n.id) || [])
+                          : validOptions.filter(o => o.node_key === n.node_key);
+
+                        opts.forEach((o: any) => {
+                          if (o.next_node_key) {
+                            parentMap.set(o.next_node_key, n.node_key);
+                          }
+                        });
+                      });
+
+                      const path: any[] = [];
+                      let curr: string | undefined = targetKey;
+                      const visited = new Set<string>();
+
+                      while (curr && !visited.has(curr)) {
+                        visited.add(curr);
+                        const node = validNodes.find(n => n.node_key === curr);
+                        if (node) path.unshift(node);
+                        curr = parentMap.get(curr);
+                        if (path.length > 5) break; // Limit depth for UI sanity
+                      }
+
+                      return path;
+                    };
+
+                    const pathNodes = getReversePath(previewNodeKey || '');
+
+                    // Render path
+                    return pathNodes.map((node, idx) => {
+                      if (!node) return null;
+                      const isLast = idx === pathNodes.length - 1;
+
+                      return (
+                        <div key={idx} className={`space-y-3 ${isLast ? 'opacity-100' : 'opacity-60'}`}>
+                          {/* Bot Message */}
+                          <div className="flex items-end gap-2 max-w-[90%]">
+                            <div className="w-6 h-6 rounded-full bg-blue-500 shrink-0 mb-1"></div>
+                            <div className="bg-[#182533] p-3 rounded-2xl rounded-bl-sm shadow-sm border border-gray-800">
+                              <div className="text-[13px] leading-relaxed whitespace-pre-wrap text-white">
+                                {node.prompt_i18n?.en || '...'}
                               </div>
-                            ))}
-                            {(previewOptions || []).length === 0 && (
-                              <div className="text-[10px] text-gray-500 italic">No options added yet</div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Other type hints */}
-                        {previewNode.type === 'file' && (
-                          <div className="flex justify-center mt-2">
-                            <div className="bg-[#17212b] text-blue-400 py-2 px-4 rounded-full text-xs flex items-center gap-2 border border-blue-500/30">
-                              <FileText className="w-3 h-3" /> Upload File
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </>
-                  )}
+
+                          {/* Simulated User Reply (if not last) */}
+                          {!isLast && (
+                            <div className="flex justify-end pr-2">
+                              <div className="bg-[#2b5278] text-white p-2 rounded-l-xl rounded-tr-xl rounded-br-none max-w-[80%] text-sm">
+                                User Reply...
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Controls for Last Node */}
+                          {isLast && (
+                            <div className="mt-4">
+                              {node.type === 'text' && (
+                                <div className="bg-[#17212b] p-2 rounded-t-xl opacity-50 border-t border-gray-700">
+                                  <div className="text-xs text-gray-400 px-2 italic">User types reply...</div>
+                                </div>
+                              )}
+                              {(node.type === 'single_choice' || node.type === 'multi_choice') && (
+                                <div className="flex flex-wrap gap-2 justify-center">
+                                  {(node.id
+                                    ? (optionsByNodeId.get(node.id) || [])
+                                    : validOptions.filter(o => o && o.node_key === node.node_key)
+                                  ).map((o: any) => (
+                                    <div key={o.option_key} className="bg-[#2b5278] text-white text-xs px-3 py-2 rounded-lg border border-black/20 font-medium">
+                                      {o.label_i18n?.en || 'Option'}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                  {/* Controls for Last Node handled in path loop */}
                 </div>
               </div>
             </div>
-            <div className="text-center mt-4 text-xs text-muted-foreground">
-              Live Preview • {previewNode?.node_key}
-            </div>
+          </div>
+          <div className="text-center mt-4 text-xs text-muted-foreground">
+            Live Preview • {previewNode?.node_key}
           </div>
         </div>
       </div>
