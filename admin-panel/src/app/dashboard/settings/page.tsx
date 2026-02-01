@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle } from 'lucide-react';
+import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle, ArrowUp, ArrowDown, Eye, EyeOff, Trash2, Plus, Image as ImageIcon, Video, Link as LinkIcon, Type } from 'lucide-react';
 
 import { motion } from 'framer-motion';
 import {
@@ -94,7 +94,7 @@ export default function SettingsPage() {
   };
 
   const handleValueChange = (key: string, newValue: string) => {
-    setSettings(settings.map(setting => 
+    setSettings(settings.map(setting =>
       setting.key === key ? { ...setting, value: newValue } : setting
     ));
   };
@@ -174,18 +174,17 @@ export default function SettingsPage() {
           </motion.button>
         </div>
       </div>
-      
+
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <ul className="flex flex-wrap -mb-px">
           <li className="mr-2">
-            <button 
+            <button
               onClick={() => setActiveTab('welcome')}
-              className={`inline-block p-4 border-b-2 ${
-                activeTab === 'welcome' 
-                  ? 'text-blue-600 border-blue-600' 
-                  : 'text-gray-500 border-transparent hover:text-gray-700'
-              } rounded-t-lg`}
+              className={`inline-block p-4 border-b-2 ${activeTab === 'welcome'
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-500 border-transparent hover:text-gray-700'
+                } rounded-t-lg`}
             >
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-4 w-4" />
@@ -201,9 +200,8 @@ export default function SettingsPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`mb-4 p-4 rounded-lg ${
-            message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}
+          className={`mb-4 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}
         >
           {message.text}
         </motion.div>
@@ -211,246 +209,336 @@ export default function SettingsPage() {
 
       {/* Welcome (Legacy + Builder) */}
       {activeTab === 'welcome' && (
-        <div className="grid gap-4">
-          {/* Welcome Builder */}
-          <div className="p-4 rounded-lg bg-white shadow-sm border">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Editor Column */}
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-900">Welcome Messages</h3>
-              <button
-                type="button"
-                className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm"
-                onClick={() => {
-                  const nextSort = (welcomeBlocks?.length || 0);
-                  setWelcomeBlocks([
-                    ...(welcomeBlocks || []),
-                    { sort_order: nextSort, is_active: true, block_type: 'text', payload: { text: '' } }
-                  ]);
-                }}
-              >
-                + Add Row
-              </button>
+              <h3 className="text-lg font-medium text-gray-900">Welcome Flow</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium flex items-center gap-2 transition-colors"
+                  onClick={() => {
+                    const nextSort = (welcomeBlocks?.length || 0);
+                    setWelcomeBlocks([
+                      ...(welcomeBlocks || []),
+                      { sort_order: nextSort, is_active: true, block_type: 'text', payload: { text: '' } }
+                    ]);
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Text
+                </button>
+                <div className="relative group">
+                  <button className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium flex items-center gap-2 transition-colors">
+                    <Plus className="w-4 h-4" />
+                    More
+                  </button>
+                  <div className="absolute right-0 mt-1 w-40 bg-white border rounded-lg shadow-xl hidden group-hover:block z-10 overflow-hidden">
+                    <button
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm flex items-center gap-2 text-gray-700"
+                      onClick={() => {
+                        const nextSort = (welcomeBlocks?.length || 0);
+                        setWelcomeBlocks([...(welcomeBlocks || []), { sort_order: nextSort, is_active: true, block_type: 'image', payload: { url: '', caption: '' } }]);
+                      }}
+                    >
+                      <ImageIcon className="w-4 h-4 text-blue-500" />
+                      Image
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm flex items-center gap-2 text-gray-700"
+                      onClick={() => {
+                        const nextSort = (welcomeBlocks?.length || 0);
+                        setWelcomeBlocks([...(welcomeBlocks || []), { sort_order: nextSort, is_active: true, block_type: 'video', payload: { url: '', caption: '' } }]);
+                      }}
+                    >
+                      <Video className="w-4 h-4 text-red-500" />
+                      Video
+                    </button>
+                    <button
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm flex items-center gap-2 text-gray-700"
+                      onClick={() => {
+                        const nextSort = (welcomeBlocks?.length || 0);
+                        setWelcomeBlocks([...(welcomeBlocks || []), { sort_order: nextSort, is_active: true, block_type: 'link', payload: { title: 'Link', url: 'https://' } }]);
+                      }}
+                    >
+                      <LinkIcon className="w-4 h-4 text-green-500" />
+                      Link Button
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-3 overflow-auto">
-              <table className="min-w-full text-sm border">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="p-2 border">Order</th>
-                    <th className="p-2 border">Active</th>
-                    <th className="p-2 border">Type</th>
-                    <th className="p-2 border">Content</th>
-                    <th className="p-2 border">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(welcomeBlocks || []).map((b: any, idx: number) => (
-                    <tr key={idx} className="align-top">
-                      <td className="p-2 border w-16 text-center">{idx + 1}</td>
-                      <td className="p-2 border w-20 text-center">
+            <div className="space-y-3">
+              {(welcomeBlocks || []).map((b: any, idx: number) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-4 rounded-xl border-2 transition-colors ${b.is_active !== false ? 'bg-white border-gray-100 hover:border-blue-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-md uppercase font-bold tracking-wider">
+                        {b.block_type}
+                      </span>
+                      <span className="text-xs text-gray-400">#{idx + 1}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        disabled={idx === 0}
+                        onClick={() => {
+                          if (idx === 0) return;
+                          const copy = [...(welcomeBlocks || [])];
+                          const tmp = copy[idx - 1];
+                          copy[idx - 1] = copy[idx];
+                          copy[idx] = tmp;
+                          setWelcomeBlocks(copy);
+                        }}
+                        title="Move Up"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        disabled={idx === (welcomeBlocks?.length || 0) - 1}
+                        onClick={() => {
+                          const copy = [...(welcomeBlocks || [])];
+                          if (idx >= copy.length - 1) return;
+                          const tmp = copy[idx + 1];
+                          copy[idx + 1] = copy[idx];
+                          copy[idx] = tmp;
+                          setWelcomeBlocks(copy);
+                        }}
+                        title="Move Down"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                      <button
+                        className={`p-1.5 rounded-md transition-all ${b.is_active !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        onClick={() => {
+                          const copy = [...(welcomeBlocks || [])];
+                          copy[idx] = { ...copy[idx], is_active: !(b.is_active !== false) };
+                          setWelcomeBlocks(copy);
+                        }}
+                        title={b.is_active !== false ? "Active" : "Inactive"}
+                      >
+                        {b.is_active !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                      <button
+                        className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all ml-1"
+                        onClick={() => {
+                          const copy = [...(welcomeBlocks || [])];
+                          copy.splice(idx, 1);
+                          setWelcomeBlocks(copy);
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Block Content Inputs */}
+                  <div className="space-y-3">
+                    {b.block_type === 'text' && (
+                      <textarea
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        rows={3}
+                        value={b.payload?.text || ''}
+                        onChange={(e) => {
+                          const copy = [...(welcomeBlocks || [])];
+                          copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), text: e.target.value } };
+                          setWelcomeBlocks(copy);
+                        }}
+                        placeholder="Enter welcome message... (HTML supported)"
+                      />
+                    )}
+
+                    {b.block_type === 'link' && (
+                      <div className="grid grid-cols-2 gap-3">
                         <input
-                          type="checkbox"
-                          checked={b.is_active !== false}
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                          value={b.payload?.title || ''}
                           onChange={(e) => {
                             const copy = [...(welcomeBlocks || [])];
-                            copy[idx] = { ...copy[idx], is_active: e.target.checked };
+                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), title: e.target.value } };
                             setWelcomeBlocks(copy);
                           }}
+                          placeholder="Button Label"
                         />
-                      </td>
-                      <td className="p-2 border w-44">
-                        <select
-                          className="w-full px-2 py-1 border rounded"
-                          value={b.block_type}
+                        <input
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                          value={b.payload?.url || ''}
                           onChange={(e) => {
-                            const t = e.target.value as WelcomeBlockType;
                             const copy = [...(welcomeBlocks || [])];
-                            const payload =
-                              t === 'text'
-                                ? { text: '' }
-                                : t === 'link'
-                                  ? { title: '', url: '' }
-                                  : t === 'image'
-                                    ? { url: '', caption: '' }
-                                    : t === 'video'
-                                      ? { url: '', caption: '' }
-                                      : { slug: '' };
-                            copy[idx] = { ...copy[idx], block_type: t, payload };
+                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
                             setWelcomeBlocks(copy);
                           }}
-                        >
-                          <option value="text">Text</option>
-                          <option value="link">Link</option>
-                          <option value="image">Image</option>
-                          <option value="video">Video</option>
-                          <option value="question_flow">Question (Flow)</option>
-                        </select>
-                      </td>
-                      <td className="p-2 border">
-                        {b.block_type === 'text' && (
-                          <textarea
-                            className="w-full px-2 py-1 border rounded"
-                            rows={3}
-                            value={b.payload?.text || ''}
+                          placeholder="https://example.com"
+                        />
+                      </div>
+                    )}
+
+                    {(b.block_type === 'image' || b.block_type === 'video') && (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                            value={b.payload?.url || ''}
                             onChange={(e) => {
                               const copy = [...(welcomeBlocks || [])];
-                              copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), text: e.target.value } };
+                              copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
                               setWelcomeBlocks(copy);
                             }}
-                            placeholder="Text content"
+                            placeholder={`URL to ${b.block_type}...`}
                           />
-                        )}
-
-                        {b.block_type === 'link' && (
-                          <div className="grid gap-2">
+                          <label className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 cursor-pointer text-sm font-medium">
+                            Upload
                             <input
-                              className="w-full px-2 py-1 border rounded"
-                              value={b.payload?.title || ''}
-                              onChange={(e) => {
-                                const copy = [...(welcomeBlocks || [])];
-                                copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), title: e.target.value } };
-                                setWelcomeBlocks(copy);
-                              }}
-                              placeholder="Link title"
-                            />
-                            <input
-                              className="w-full px-2 py-1 border rounded"
-                              value={b.payload?.url || ''}
-                              onChange={(e) => {
-                                const copy = [...(welcomeBlocks || [])];
-                                copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
-                                setWelcomeBlocks(copy);
-                              }}
-                              placeholder="https://example.com"
-                            />
-                          </div>
-                        )}
-
-                        {(b.block_type === 'image' || b.block_type === 'video') && (
-                          <div className="grid gap-2">
-                            <div className="flex gap-2">
-                              <input
-                                className="flex-1 px-2 py-1 border rounded"
-                                value={b.payload?.url || ''}
-                                onChange={(e) => {
+                              type="file"
+                              accept={b.block_type === 'image' ? 'image/*' : 'video/*'}
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  setSaving(true);
+                                  const up = await uploadFile(file, 'welcome');
                                   const copy = [...(welcomeBlocks || [])];
-                                  copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
+                                  copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: up.url } };
                                   setWelcomeBlocks(copy);
-                                }}
-                                placeholder="Media URL"
-                              />
-
-                              <label className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 cursor-pointer whitespace-nowrap">
-                                Upload {b.block_type === 'image' ? 'Image' : 'Video'}
-                                <input
-                                  type="file"
-                                  accept={b.block_type === 'image' ? 'image/*' : 'video/*'}
-                                  className="hidden"
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-                                    try {
-                                      setSaving(true);
-                                      const up = await uploadFile(file, 'welcome');
-                                      const copy = [...(welcomeBlocks || [])];
-                                      copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: up.url } };
-                                      setWelcomeBlocks(copy);
-                                      setMessage({ type: 'success', text: `${b.block_type === 'image' ? 'Image' : 'Video'} uploaded` });
-                                      setTimeout(() => setMessage(null), 2500);
-                                    } catch (err) {
-                                      setMessage({ type: 'error', text: 'Upload failed' });
-                                    } finally {
-                                      setSaving(false);
-                                      // allow re-upload of same file
-                                      e.currentTarget.value = '';
-                                    }
-                                  }}
-                                />
-                              </label>
-                            </div>
-
-                            <input
-                              className="w-full px-2 py-1 border rounded"
-                              value={b.payload?.caption || ''}
-                              onChange={(e) => {
-                                const copy = [...(welcomeBlocks || [])];
-                                copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), caption: e.target.value } };
-                                setWelcomeBlocks(copy);
+                                  setMessage({ type: 'success', text: 'Upload successful' });
+                                  setTimeout(() => setMessage(null), 2000);
+                                } catch (err) {
+                                  setMessage({ type: 'error', text: 'Upload failed' });
+                                } finally {
+                                  setSaving(false);
+                                  e.currentTarget.value = '';
+                                }
                               }}
-                              placeholder="Caption (optional)"
                             />
-                          </div>
-                        )}
-
-                        {b.block_type === 'question_flow' && (
-                          <div className="grid gap-2">
-                            <input
-                              className="w-full px-2 py-1 border rounded"
-                              value={b.payload?.slug || ''}
-                              onChange={(e) => {
-                                const copy = [...(welcomeBlocks || [])];
-                                copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), slug: e.target.value } };
-                                setWelcomeBlocks(copy);
-                              }}
-                              placeholder="Flow slug (published)"
-                            />
-                            <div className="text-xs text-gray-500">
-                              This will start the published flow after previous welcome items.
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 border w-40">
-                        <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            className="px-2 py-1 border rounded hover:bg-gray-50"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              if (idx === 0) return;
-                              const copy = [...(welcomeBlocks || [])];
-                              const tmp = copy[idx - 1];
-                              copy[idx - 1] = copy[idx];
-                              copy[idx] = tmp;
-                              setWelcomeBlocks(copy);
-                            }}
-                          >
-                            ▲ Up
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 border rounded hover:bg-gray-50"
-                            disabled={idx === (welcomeBlocks?.length || 0) - 1}
-                            onClick={() => {
-                              const copy = [...(welcomeBlocks || [])];
-                              if (idx >= copy.length - 1) return;
-                              const tmp = copy[idx + 1];
-                              copy[idx + 1] = copy[idx];
-                              copy[idx] = tmp;
-                              setWelcomeBlocks(copy);
-                            }}
-                          >
-                            ▼ Down
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 border rounded text-red-600 hover:bg-red-50"
-                            onClick={() => {
-                              const copy = [...(welcomeBlocks || [])];
-                              copy.splice(idx, 1);
-                              setWelcomeBlocks(copy);
-                            }}
-                          >
-                            ✖ Delete
-                          </button>
+                          </label>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <input
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                          value={b.payload?.caption || ''}
+                          onChange={(e) => {
+                            const copy = [...(welcomeBlocks || [])];
+                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), caption: e.target.value } };
+                            setWelcomeBlocks(copy);
+                          }}
+                          placeholder="Media caption (HTML supported)"
+                        />
+                      </div>
+                    )}
 
-      
+                    {b.block_type === 'question_flow' && (
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <label className="block text-xs font-semibold text-blue-700 uppercase mb-1">Flow Slug</label>
+                        <input
+                          className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm"
+                          value={b.payload?.slug || ''}
+                          onChange={(e) => {
+                            const copy = [...(welcomeBlocks || [])];
+                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), slug: e.target.value } };
+                            setWelcomeBlocks(copy);
+                          }}
+                          placeholder="e.g. onboarding_flow"
+                        />
+                        <p className="text-xs text-blue-600 mt-1">This flow will trigger after this block.</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+
+              {(!welcomeBlocks || welcomeBlocks.length === 0) && (
+                <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 text-gray-500">
+                  <p>No welcome blocks yet.</p>
+                  <p className="text-sm">Add a text message or image to get started.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Preview Column */}
+          <div className="pt-8 lg:pt-0">
+            <div className="sticky top-8">
+              <div className="bg-gray-900 rounded-[2.5rem] p-4 shadow-2xl border-4 border-gray-800 max-w-sm mx-auto overflow-hidden relative min-h-[600px]">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-6 bg-gray-800 rounded-b-2xl z-20"></div>
+
+                {/* Telegram Header */}
+                <div className="bg-[#242f3d] -m-4 mb-4 p-4 pt-8 text-white flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-400 to-blue-600 flex items-center justify-center text-sm font-bold">
+                    B
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">BotDash Bot</div>
+                    <div className="text-xs text-blue-300">bot</div>
+                  </div>
+                </div>
+
+                {/* Message Area */}
+                <div className="space-y-4 pt-2 pb-20 px-1 overflow-auto h-[500px] scrollbar-hide bg-[#0e1621] -mx-1">
+                  <div className="text-center text-xs text-gray-500 my-4 bg-[#182533] inline-block px-3 py-1 rounded-full mx-auto">Today</div>
+
+                  {/* Start Command */}
+                  <div className="flex justify-end pr-2">
+                    <div className="bg-[#2b5278] text-white p-2 rounded-l-xl rounded-tr-xl rounded-br-none max-w-[80%] text-sm">
+                      /start
+                    </div>
+                  </div>
+
+                  {/* Bot Blocks */}
+                  {(welcomeBlocks || []).filter((b: any) => b.is_active !== false).map((b: any, idx: number) => (
+                    <div key={idx} className="flex flex-col gap-1 pl-2">
+                      {/* Image/Video Block */}
+                      {(b.block_type === 'image' || b.block_type === 'video') && b.payload?.url ? (
+                        <div className="bg-[#182533] p-1 rounded-xl max-w-[85%] self-start border border-[#0e1621]">
+                          <div className="bg-gray-700 w-full h-32 rounded-lg mb-1 relative overflow-hidden flex items-center justify-center text-gray-500 text-xs">
+                            {b.payload.url.startsWith('http')
+                              ? <img src={b.payload.url} alt="media" className="w-full h-full object-cover" />
+                              : <span>Media Preview</span>}
+                          </div>
+                          {b.payload.caption && (
+                            <div className="px-2 pb-1 text-sm text-white whitespace-pre-wrap">{b.payload.caption}</div>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {/* Text Block */}
+                      {b.block_type === 'text' && b.payload?.text && (
+                        <div className="bg-[#182533] text-white p-3 rounded-r-xl rounded-tl-xl rounded-bl-none max-w-[85%] text-sm whitespace-pre-wrap">
+                          {b.payload.text}
+                        </div>
+                      )}
+
+                      {/* Link Block */}
+                      {b.block_type === 'link' && b.payload?.title && (
+                        <div className="bg-[#182533] text-blue-400 p-3 rounded-xl max-w-[85%] text-sm text-center font-medium border border-[#0e1621] cursor-pointer hover:bg-[#202b36]">
+                          {b.payload.title} ↗
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input Area */}
+                <div className="absolute bottom-4 left-4 right-4 h-12 bg-[#182533] rounded-full border border-gray-700 flex items-center px-4 text-gray-500 text-sm">
+                  Message...
+                </div>
+              </div>
+              <div className="text-center mt-4 text-gray-500 text-sm italic">
+                Live Preview
+              </div>
+            </div>
           </div>
         </div>
       )}
