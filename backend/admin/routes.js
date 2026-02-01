@@ -827,9 +827,7 @@ router.patch('/users/:id/points',
 // Ban or unban a user
 router.patch('/users/:id/ban',
   adminAuth,
-  activityLogger('moderate_user', 'user', 'id', (req) => ({
-    action: req.body.is_banned ? 'banned' : 'unbanned'
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -854,10 +852,7 @@ router.patch('/users/:id/ban',
 // Toggle premium status for a user
 router.patch('/users/:id/premium',
   adminAuth,
-  activityLogger('update_premium', 'user', 'id', (req) => ({
-    action: req.body.is_premium ? 'granted_premium' : 'removed_premium',
-    premium_until: req.body.premium_until
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -937,11 +932,7 @@ router.get('/youtube-tasks', adminAuth, async (req, res) => {
 // Add a new YouTube video task
 router.post('/youtube-tasks',
   adminAuth,
-  activityLogger('create', 'youtube_task', (req, data) => data.task?.id, (req) => ({
-    youtube_url: req.body.youtube_url,
-    title: req.body.title || 'YouTube Task',
-    question_count: req.body.questions?.length || 0
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { youtube_url, expires_at, questions, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit } = req.body;
@@ -1018,11 +1009,7 @@ router.post('/youtube-tasks',
 // Update/expire/disable a YouTube video task
 router.patch('/youtube-tasks/:id',
   adminAuth,
-  activityLogger('update', 'youtube_task', 'id', (req) => ({
-    changes: Object.keys(req.body),
-    disabled: req.body.disabled,
-    expires_at: req.body.expires_at
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -1289,10 +1276,7 @@ router.get('/telegram-channels/:id', adminAuth, async (req, res) => {
 // Add a new channel
 router.post('/telegram-channels',
   adminAuth,
-  activityLogger('create', 'telegram_channel', (req, data) => data.channel?.id, (req) => ({
-    link: req.body.link,
-    require_premium: req.body.require_premium || false
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       let { link, expires_at, require_premium } = req.body;
@@ -1418,11 +1402,7 @@ router.post('/telegram-channels',
 // Edit/disable/enable a channel
 router.patch('/telegram-channels/:id',
   adminAuth,
-  activityLogger('update', 'telegram_channel', 'id', (req) => ({
-    changes: Object.keys(req.body),
-    disabled: req.body.disabled,
-    expires_at: req.body.expires_at
-  })),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -1442,7 +1422,7 @@ router.patch('/telegram-channels/:id',
 // Delete a channel
 router.delete('/telegram-channels/:id',
   adminAuth,
-  activityLogger('delete', 'telegram_channel', 'id'),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -2246,11 +2226,7 @@ router.get('/quizzes/:id', adminAuth, async (req, res) => {
 // Create new quiz
 router.post('/quizzes',
   adminAuth,
-  activityLogger('create', 'quiz', (req, data) => data.quiz?.id, (req) => ({
-    title: req.body.title,
-    category: req.body.category,
-    question_count: req.body.questions?.length || 0
-  })),
+  // activityLogger removed
   async (req, res) => {
     const client = await pool.connect();
     try {
@@ -2301,11 +2277,7 @@ router.post('/quizzes',
 // Update quiz
 router.put('/quizzes/:id',
   adminAuth,
-  activityLogger('update', 'quiz', 'id', (req) => ({
-    title: req.body.title,
-    changes: Object.keys(req.body),
-    is_active: req.body.is_active
-  })),
+  // activityLogger removed
   async (req, res) => {
     const client = await pool.connect();
     try {
@@ -2373,7 +2345,7 @@ router.put('/quizzes/:id',
 // Delete quiz
 router.delete('/quizzes/:id',
   adminAuth,
-  activityLogger('delete', 'quiz', 'id'),
+  // activityLogger removed
   async (req, res) => {
     try {
       const { id } = req.params;

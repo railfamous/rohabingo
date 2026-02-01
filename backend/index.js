@@ -17,14 +17,24 @@ logger.info('Starting Dashbot Backend Server', {
 });
 
 // Optional: run database migrations on startup (use with care in production)
+console.log('Requiring migrations...');
 const { applyMigrations } = require('./migrations');
 
 // Import admin routes
-const adminRoutes = require('./admin/routes');
+console.log('Requiring admin routes...');
+let adminRoutes;
+try {
+  adminRoutes = require('./admin/routes');
+  console.log('Admin routes loaded successfully.');
+} catch (error) {
+  console.error('CRITICAL ERROR loading admin routes:', error);
+  // Keep going to see if app starts without them or if it exits here
+}
 
 // Import optimized auth middleware
 const { validateTelegramWebAppData, getCacheStats, invalidateUserCache } = require('./middleware/optimized-auth');
 
+console.log('Initializing app theme...');
 // Modern color theme based on Telegram's native palette
 const appTheme = {
   primary: '#5288c1',      // Button color <mcreference link="https://docs.telegram-mini-apps.com/platform/theming" index="4">4</mcreference>
@@ -102,6 +112,7 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' })); // Limit payload size
 app.use(express.urlencoded({ extended: true, limit: '1mb' })); // Handle form data
 
+console.log('Mounting routes...');
 // Initialize admin roles removed
 // const { initializeAdminRoles } = require('./admin/initialize');
 
@@ -263,6 +274,7 @@ app.use((err, req, res, next) => {
 // Start server and bot
 const PORT = process.env.PORT || 3000;
 
+console.log('Invoking IIFE...');
 (async () => {
   let bot = null;
 
