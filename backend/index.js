@@ -21,7 +21,6 @@ const { applyMigrations } = require('./migrations');
 
 // Import admin routes
 const adminRoutes = require('./admin/routes');
-const promotionStatsRoutes = require('./admin/promotion-stats');
 
 // Import optimized auth middleware
 const { validateTelegramWebAppData, getCacheStats, invalidateUserCache } = require('./middleware/optimized-auth');
@@ -103,43 +102,15 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' })); // Limit payload size
 app.use(express.urlencoded({ extended: true, limit: '1mb' })); // Handle form data
 
-// Initialize admin roles and superadmin account
-const { initializeAdminRoles } = require('./admin/initialize');
-initializeAdminRoles()
-  .then(success => {
-    if (success) {
-      logger.info('Admin roles and superadmin account initialized successfully');
-    } else {
-      logger.warn('Admin roles initialization skipped or failed');
-    }
-  })
-  .catch(error => {
-    logger.error('Error initializing admin roles:', {
-      error: error.message,
-      stack: error.stack
-    });
-  });
+// Initialize admin roles removed
+// const { initializeAdminRoles } = require('./admin/initialize');
 
 // Use admin routes
 app.use('/admin', adminRoutes);
-app.use('/admin/promotion-stats', promotionStatsRoutes);
-app.use('/admin/promotion-products', require('./admin/promotion-products'));
-app.use('/admin/promotion-submissions', require('./admin/promotion-submissions'));
 app.use('/admin/upload', require('./admin/upload'));
 app.use('/admin/dashboard-stats', require('./admin/dashboard-stats'));
 app.use('/admin/channel-verification', require('./admin/channel-verification'));
-app.use('/admin/roles', require('./admin/admin-roles'));
-app.use('/admin/staff', require('./admin/admin-users'));
-// Removed conflicting route: app.use('/admin/users', require('./admin/users-routes'));
-// This was overriding the miniapp users route in admin/routes.js
-
-// Mount permissions endpoint directly under /admin for frontend compatibility
-const adminRolesRouter = require('./admin/admin-roles');
-app.use('/admin/permissions', (req, res, next) => {
-  // Forward permissions requests to the roles router
-  req.url = '/permissions' + req.url;
-  adminRolesRouter(req, res, next);
-});
+// Roles and Staff routes removed
 
 // Cache stats endpoint for monitoring
 app.get('/api/cache-stats', (req, res) => {
@@ -169,44 +140,17 @@ app.use('/api', (req, res, next) => {
   return telegramAuth(req, res, next);
 });
 
-// Add this line to use the new referrals router
-app.use('/api/user/referrals', require('./api/referrals'));
-
 // Add telegram channels router
-app.use('/api/telegram-channels', require('./api/telegram-channels'));
 
-// Add video tasks router
-app.use('/api/video-tasks', require('./api/video-tasks'));
 
 // Add users router
 app.use('/api/users', require('./api/users'));
 
-// Add spin wheel router
-app.use('/api/spin-wheel', require('./api/spin-wheel'));
-
-// Add quiz router
-app.use('/api/quizzes', require('./api/quizzes'));
-
 // Add settings router
 app.use('/api/settings', require('./api/settings'));
 
-// Add promotion routes
-app.use('/api/user-promotions', require('./api/user-promotions'));
-app.use('/api/active-promotions', require('./api/active-promotions'));
-app.use('/api/promotion-costs', require('./api/promotion-costs'));
-
-// Add content creator promotion participation routes
-app.use('/api/promotion-products', require('./api/promotion-products'));
-app.use('/api/promotion-submissions', require('./api/promotion-submissions'));
-
-
 // Add new feature routes
-app.use('/api/affiliate-tasks', require('./api/affiliate-tasks'));
 app.use('/api/upload', require('./api/upload'));
-app.use('/api/courses', require('./api/courses'));
-app.use('/api/checkins', require('./api/checkins'));
-app.use('/api/ads', require('./api/ads'));
-app.use('/api/leaderboard', require('./api/leaderboard'));
 
 // User registration endpoint
 app.post('/api/user/register', async (req, res) => {
@@ -221,36 +165,36 @@ app.post('/api/user/register', async (req, res) => {
       'SELECT id, username, first_name, last_name, points, referral_code, photo_url, created_at, is_banned, is_premium, premium_until, phone_number, email FROM telegram_users WHERE id = $1',
       [req.telegramUser.id]
     );
-    
+
     const userData = userDataResult.rows[0];
-    
+
     // If there's no referral code yet, generate one
     if (!userData.referral_code) {
       let referralCode;
       let isCodeUnique = false;
-      
+
       // Keep generating codes until we find a unique one
       while (!isCodeUnique) {
         referralCode = generateReferralCode();
-        
+
         // Check if the code already exists
         const existingCode = await pool.query(
           'SELECT COUNT(*) FROM telegram_users WHERE referral_code = $1',
           [referralCode]
         );
-        
+
         if (parseInt(existingCode.rows[0].count) === 0) {
           isCodeUnique = true;
         }
       }
-      
+
       await pool.query(
         'UPDATE telegram_users SET referral_code = $1 WHERE id = $2',
         [referralCode, req.telegramUser.id]
       );
       userData.referral_code = referralCode;
     }
-    
+
     res.status(200).json({
       user: userData,
       message: 'User registered successfully'
@@ -271,90 +215,16 @@ app.get('/api/user/task-summary', async (req, res) => {
 
     // Single optimized query to get all task data at once
     const result = await pool.query(
-      `WITH 
-        settings_data AS (
-          SELECT 
-            COALESCE(MAX(CASE WHEN key = 'max_spin_wheel_plays_per_day' THEN value::integer END), 5) as max_spins
-          FROM settings
-        ),
-        user_spins AS (
-          SELECT COALESCE(COUNT(*), 0) as daily_spins_used
-          FROM spins 
-          WHERE user_id = $1 AND created_at::date = CURRENT_DATE
-        ),
-        channels_data AS (
-          SELECT 
-            COUNT(*) as total_channels,
-            COUNT(CASE WHEN COALESCE(tp.status, 'not_started') = 'completed' THEN 1 END) as completed_channels
-          FROM telegram_channels c
-          LEFT JOIN task_progress tp ON 
-            tp.task_id = c.id AND 
-            tp.task_type = 'channel_join' AND 
-            tp.user_id = $1
-          WHERE c.disabled = FALSE
-        ),
-        youtube_data AS (
-          SELECT 
-            COUNT(*) as total_youtube,
-            COUNT(CASE WHEN COALESCE(tp.status, 'not_started') = 'completed' THEN 1 END) as completed_youtube
-          FROM youtube_tasks yt
-          LEFT JOIN task_progress tp ON 
-            tp.task_id = yt.id AND 
-            tp.task_type = 'youtube_video' AND 
-            tp.user_id = $1
-          WHERE yt.disabled = FALSE
-            AND (yt.expires_at IS NULL OR yt.expires_at > NOW())
-        ),
-        quiz_data AS (
-          SELECT 
-            COUNT(*) as total_quizzes,
-            COUNT(CASE WHEN qa.user_id IS NOT NULL THEN 1 END) as completed_quizzes
-          FROM quizzes q
-          LEFT JOIN user_quiz_attempts qa ON 
-            qa.quiz_id = q.id AND 
-            qa.user_id = $1 AND
-            qa.completed_at IS NOT NULL
-          WHERE q.is_active = TRUE
-        )
-      SELECT 
-        s.max_spins,
-        us.daily_spins_used,
-        cd.total_channels,
-        cd.completed_channels,
-        yd.total_youtube,
-        yd.completed_youtube,
-        qd.total_quizzes,
-        qd.completed_quizzes
-      FROM settings_data s
-      CROSS JOIN user_spins us
-      CROSS JOIN channels_data cd
-      CROSS JOIN youtube_data yd
-      CROSS JOIN quiz_data qd`,
-      [userId]
+      `SELECT 0 as total_channels, 0 as completed_channels`
     );
 
-    const data = result.rows[0];
-    
+    const data = result.rows[0] || { total_channels: 0, completed_channels: 0 };
+
     res.json({
       telegram_channels: {
         total: parseInt(data.total_channels),
         completed: parseInt(data.completed_channels),
         left: parseInt(data.total_channels) - parseInt(data.completed_channels)
-      },
-      youtube_tasks: {
-        total: parseInt(data.total_youtube),
-        completed: parseInt(data.completed_youtube),
-        left: parseInt(data.total_youtube) - parseInt(data.completed_youtube)
-      },
-      spin_wheel: {
-        max: parseInt(data.max_spins),
-        used: parseInt(data.daily_spins_used),
-        left: Math.max(0, parseInt(data.max_spins) - parseInt(data.daily_spins_used))
-      },
-      quizzes: {
-        total: parseInt(data.total_quizzes),
-        completed: parseInt(data.completed_quizzes),
-        left: parseInt(data.total_quizzes) - parseInt(data.completed_quizzes)
       }
     });
   } catch (error) {
@@ -375,7 +245,7 @@ app.use((err, req, res, next) => {
     userId: req.telegramUser?.id,
     body: req.body
   });
-  
+
   // Log the error
   logger.error('Unhandled application error', {
     error: err.message,
@@ -386,7 +256,7 @@ app.use((err, req, res, next) => {
     userAgent: req.get('User-Agent'),
     userId: req.telegramUser?.id
   });
-  
+
   res.status(500).json({ message: 'Something went wrong!' });
 });
 

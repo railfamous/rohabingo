@@ -10,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 function ActivitiesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   // Filter states
   const [filters, setFilters] = useState<ActivityFilters>({
     type: searchParams.get('type') || undefined,
@@ -21,7 +21,7 @@ function ActivitiesContent() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  
+
   // Activity states
   const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,13 +34,13 @@ function ActivitiesContent() {
   const loadMoreRef = useCallback((node: HTMLDivElement) => {
     if (loading || loadingMore) return;
     if (observer.current) observer.current.disconnect();
-    
+
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
         loadMore();
       }
     });
-    
+
     if (node) observer.current.observe(node);
   }, [loading, loadingMore, hasMore]);
 
@@ -62,7 +62,7 @@ function ActivitiesContent() {
     };
 
     fetchActivities();
-    
+
     // Update URL with filters
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -70,10 +70,10 @@ function ActivitiesContent() {
         params.set(key, String(value));
       }
     });
-    
+
     const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
     window.history.replaceState({}, '', newUrl);
-    
+
   }, [filters]);
 
   // Load more function for infinite scroll
@@ -93,7 +93,7 @@ function ActivitiesContent() {
       setLoadingMore(false);
     }
   };
-  
+
   const handleFilterChange = (key: keyof ActivityFilters, value: any) => {
     setFilters(prev => ({
       ...prev,
@@ -102,7 +102,7 @@ function ActivitiesContent() {
     // Reset cursor and activities when filters change
     setCursor(null);
   };
-  
+
   const clearFilters = () => {
     setFilters({});
     setUserSearch('');
@@ -118,8 +118,8 @@ function ActivitiesContent() {
             </Link>
             <h1 className="text-2xl font-bold text-gray-800">Recent Activities</h1>
           </div>
-          
-          <button 
+
+          <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center px-4 py-2 bg-white border rounded-lg hover:bg-gray-50"
           >
@@ -132,20 +132,20 @@ function ActivitiesContent() {
             )}
           </button>
         </div>
-        
+
         {/* Filter panel */}
         {showFilters && (
           <div className="bg-white rounded-lg shadow p-4 mb-6 animate-fadeIn">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-semibold text-gray-700">Filter Activities</h2>
               <div className="flex space-x-2">
-                <button 
+                <button
                   onClick={clearFilters}
                   className="text-sm text-gray-500 hover:text-gray-700"
                 >
                   Clear all
                 </button>
-                <button 
+                <button
                   onClick={() => setShowFilters(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -153,7 +153,7 @@ function ActivitiesContent() {
                 </button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Activity Type Filter */}
               <div>
@@ -172,7 +172,7 @@ function ActivitiesContent() {
                   <option value="spin">Spin Wheel</option>
                 </select>
               </div>
-              
+
               {/* Task Type Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -192,7 +192,7 @@ function ActivitiesContent() {
                   <option value="spin">Spin</option>
                 </select>
               </div>
-              
+
               {/* Date Range Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -206,7 +206,7 @@ function ActivitiesContent() {
                   className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Calendar className="h-4 w-4 inline mr-1" />
@@ -219,7 +219,7 @@ function ActivitiesContent() {
                   className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               {/* User ID Filter */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -243,7 +243,7 @@ function ActivitiesContent() {
                 </div>
               </div>
             </div>
-            
+
             {/* Active filters display */}
             {Object.values(filters).some(v => v !== undefined) && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -252,7 +252,7 @@ function ActivitiesContent() {
                   return (
                     <div key={key} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full flex items-center">
                       {key.replace('_', ' ')}: {value}
-                      <button 
+                      <button
                         onClick={() => handleFilterChange(key as keyof ActivityFilters, undefined)}
                         className="ml-1 text-blue-600 hover:text-blue-800"
                       >
@@ -275,7 +275,7 @@ function ActivitiesContent() {
           ) : error ? (
             <div className="py-8 text-center">
               <p className="text-red-500">{error}</p>
-              <button 
+              <button
                 onClick={() => window.location.reload()}
                 className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               >
@@ -311,9 +311,6 @@ function ActivitiesContent() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-1 rounded">
-                      +{item.points} points
-                    </span>
                     <span className="text-xs text-gray-500 mt-1">
                       {item.type} / {item.task_type}
                     </span>
@@ -324,11 +321,11 @@ function ActivitiesContent() {
           ) : (
             <div className="py-12 text-center text-gray-500">No activities found</div>
           )}
-          
+
           {/* Infinite scroll loader */}
           {!loading && hasMore && (
-            <div 
-              ref={loadMoreRef} 
+            <div
+              ref={loadMoreRef}
               className="py-4 flex justify-center"
             >
               {loadingMore ? (
@@ -341,7 +338,7 @@ function ActivitiesContent() {
               )}
             </div>
           )}
-          
+
           {!hasMore && activities.length > 0 && (
             <div className="py-4 text-center text-gray-500">
               You've reached the end!

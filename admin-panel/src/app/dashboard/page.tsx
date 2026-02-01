@@ -37,7 +37,7 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6 text-gray-800">Dashboard Overview</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Stats Cards */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -47,14 +47,14 @@ export default function DashboardPage() {
               <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.totalUsers ?? '-'}</h3>
             </div>
             <div className="bg-blue-100 rounded-full p-3">
-              <svg 
-                width="24" 
-                height="24" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="text-blue-500"
               >
@@ -67,7 +67,7 @@ export default function DashboardPage() {
           </div>
           <p className="text-green-600 text-sm font-medium mt-2">&nbsp;</p>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -75,14 +75,14 @@ export default function DashboardPage() {
               <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.activeQuizzes ?? '-'}</h3>
             </div>
             <div className="bg-purple-100 rounded-full p-3">
-              <svg 
-                width="24" 
-                height="24" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="text-purple-500"
               >
@@ -94,7 +94,7 @@ export default function DashboardPage() {
           </div>
           <p className="text-green-600 text-sm font-medium mt-2">&nbsp;</p>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -102,14 +102,14 @@ export default function DashboardPage() {
               <h3 className="text-2xl font-bold mt-1 text-gray-800">{loading ? '...' : summary?.videoTasks ?? '-'}</h3>
             </div>
             <div className="bg-red-100 rounded-full p-3">
-              <svg 
-                width="24" 
-                height="24" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="text-red-500"
               >
@@ -120,9 +120,9 @@ export default function DashboardPage() {
           </div>
           <p className="text-red-600 text-sm font-medium mt-2">&nbsp;</p>
         </div>
-        
+
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -136,22 +136,19 @@ export default function DashboardPage() {
                   <p className="font-medium text-gray-800">{item.first_name} {item.last_name} {item.username && <span className="text-gray-400 ml-1">@{item.username}</span>}</p>
                   <p className="text-sm text-gray-500">{item.description} • {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}</p>
                 </div>
-                <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-1 rounded">
-                  +{item.points} points
-                </span>
               </div>
             )) : (
               <div className="py-4 text-center text-gray-500">No recent activity</div>
             )}
           </div>
-          <Link 
+          <Link
             href="/dashboard/activities"
             className="text-blue-600 text-sm font-medium mt-4 hover:underline"
           >
             View all activity →
           </Link>
         </div>
-        
+
         {/* Top Performing Users */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4 text-gray-800">Top Performing Users</h2>
@@ -160,7 +157,6 @@ export default function DashboardPage() {
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   <th className="py-3 px-4 text-left text-gray-800">User</th>
-                  <th className="py-3 px-4 text-left text-gray-800">Points</th>
                   <th className="py-3 px-4 text-left text-gray-800">Tasks</th>
                   <th className="py-3 px-4 text-left text-gray-800">Referrals</th>
                 </tr>
@@ -173,7 +169,6 @@ export default function DashboardPage() {
                     <td className="py-3 px-4 font-medium text-gray-800">
                       {user.first_name} {user.last_name} {user.username && <span className="text-gray-400 ml-1">@{user.username}</span>}
                     </td>
-                    <td className="py-3 px-4 text-blue-600 font-medium">{user.points.toLocaleString()}</td>
                     <td className="py-3 px-4 text-gray-800">{user.completed_tasks_count}</td>
                     <td className="py-3 px-4 text-gray-800">{user.referral_count}</td>
                   </tr>
@@ -183,7 +178,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-          <Link 
+          <Link
             href="/dashboard/users"
             className="text-blue-600 text-sm font-medium mt-4 hover:underline"
           >

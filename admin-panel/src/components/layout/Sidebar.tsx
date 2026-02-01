@@ -18,7 +18,7 @@ type NavItem = {
 };
 
 // Navigation items for sidebar
-const navItems = [
+const navItems: NavItem[] = [
   // Primary communication & flow items
   { name: 'Inbox', href: '/dashboard/inbox', icon: 'message-circle' },
   { name: 'User Requests', href: '/dashboard/user-requests', icon: 'message-circle', showCount: 'pending' },
@@ -31,23 +31,8 @@ const navItems = [
 
   // Main dashboard and task items
   { name: 'Dashboard', href: '/dashboard', icon: 'grid' },
-  { name: 'Quiz Tasks', href: '/dashboard/quiz-tasks', icon: 'help-circle', showCount: 'active' },
-  { name: 'Video Tasks', href: '/dashboard/video-tasks', icon: 'video', showCount: 'active' },
-  { name: 'Affiliate Tasks', href: '/dashboard/affiliate-tasks', icon: 'external-link', showCount: 'active' },
-  { name: 'Courses', href: '/dashboard/courses', icon: 'book-open', showCount: 'active' },
-  { name: 'Telegram Channels', href: '/dashboard/telegram-channels', icon: 'message-circle', showCount: 'active' },
-  { name: 'User Promotions', href: '/dashboard/user-promotions', icon: 'trending-up', showCount: 'pending' },
-  { name: 'Promotion Products', href: '/dashboard/promotion-products', icon: 'package', showCount: 'active' },
-  { name: 'Promotion Submissions', href: '/dashboard/promotion-submissions', icon: 'clipboard', showCount: 'pending' },
-  { name: 'Spin Wheel', href: '/dashboard/spin-wheel', icon: 'loader', showCount: 'active' },
+
   { name: 'Users', href: '/dashboard/users', icon: 'users', showCount: 'active' },
-  { name: 'Referrals', href: '/dashboard/referrals', icon: 'users-2', showCount: 'total' },
-  { name: 'Promotion Settings', href: '/dashboard/promotion-settings', icon: 'settings' },
-  
-  // System Administration section
-  { name: 'Admin Roles', href: '/dashboard/admin/roles', icon: 'shield', permission: 'manage_roles' },
-  { name: 'Admin Users', href: '/dashboard/admin/users', icon: 'user-cog', permission: 'manage_admin_users' },
-  { name: 'Activity Logs', href: '/dashboard/admin/activity-logs', icon: 'activity', permission: 'view_activity_logs' },
 ];
 
 export default function Sidebar() {
@@ -60,7 +45,7 @@ export default function Sidebar() {
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
-  
+
   // Load saved sidebar width from localStorage
   useEffect(() => {
     const savedWidth = localStorage.getItem('sidebarWidth');
@@ -136,43 +121,20 @@ export default function Sidebar() {
     };
 
     fetchStats();
-    
+
     // Refresh stats every 30 seconds
     const interval = setInterval(fetchStats, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
   const getCountForItem = (href: string, countType: string): number | null => {
     if (!stats) return null;
-    
+
     switch (href) {
-      case '/dashboard/quiz-tasks':
-        return countType === 'active' ? stats.quizzes?.active || 0 : null;
-      case '/dashboard/video-tasks':
-        return countType === 'active' ? stats.youtube_tasks?.active || 0 : null;
-      case '/dashboard/affiliate-tasks':
-        return countType === 'active' ? stats.affiliateTasks?.active || 0 : null;
-      case '/dashboard/courses':
-        return countType === 'active' ? stats.courses?.active || 0 : null;
-      case '/dashboard/telegram-channels':
-        return countType === 'active' ? stats.telegram_channels?.active || 0 : null;
-      case '/dashboard/user-promotions':
-        if (countType === 'pending') return stats.user_submitted_promotions?.pending || 0;
-        if (countType === 'active') return stats.user_submitted_promotions?.active || 0;
-        return null;
-      case '/dashboard/promotion-products':
-        return countType === 'active' ? stats.spinWheelRewards?.active || 0 : null; // Assuming promotion products use spin wheel rewards for now
-      case '/dashboard/promotion-submissions':
-        if (countType === 'pending') return stats.promotion_submissions?.pending || 0;
-        if (countType === 'approved') return stats.promotion_submissions?.approved || 0;
-        return null;
-      case '/dashboard/spin-wheel':
-        return countType === 'active' ? stats.spin_wheel_rewards?.active || 0 : null;
+
       case '/dashboard/users':
         return countType === 'active' ? stats.users?.active || 0 : null;
-      case '/dashboard/referrals':
-        return countType === 'total' ? stats.referrals?.total || 0 : null;
       default:
         return null;
     }
@@ -204,41 +166,40 @@ export default function Sidebar() {
           <h1 className="text-2xl font-bold text-white">Dashbot</h1>
           <p className="text-gray-400 text-sm text-white">Admin Panel</p>
         </div>
-        
+
         <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
           <ul className="space-y-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               const count = item.showCount ? getCountForItem(item.href, item.showCount) : null;
-              
+
               // Skip items that require permissions the user doesn't have
               if (item.permission && !hasPermission(item.permission) && !isSuperAdmin) {
                 return null;
               }
-              
+
               return (
                 <li key={item.href}>
-                  <Link 
+                  <Link
                     href={item.href}
-                    className={`flex items-center justify-between px-3 py-2 rounded-md text-sm ${
-                      isActive 
-                        ? 'bg-blue-600 sidebar-active' 
-                        : 'sidebar-link hover:bg-gray-700'
-                    }`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-md text-sm ${isActive
+                      ? 'bg-blue-600 sidebar-active'
+                      : 'sidebar-link hover:bg-gray-700'
+                      }`}
                   >
                     <div className="flex items-center">
                       <span className="mr-3 text-white">
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2" 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                           className="feather"
-                   >
+                        >
                           {item.icon === 'grid' && (
                             <>
                               <rect x="3" y="3" width="7" height="7" />
@@ -367,7 +328,7 @@ export default function Sidebar() {
                         {item.name}
                       </span>
                     </div>
-                    
+
                     {/* Count Badge */}
                     {count !== null && count > 0 && (
                       <span className={`${item.showCount ? getBadgeColor(item.showCount) : 'bg-gray-500'} text-white text-xs px-2 py-1 rounded-full min-w-[20px] text-center`}>
@@ -397,4 +358,4 @@ export default function Sidebar() {
       </div>
     </aside>
   );
-} 
+}

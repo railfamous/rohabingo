@@ -34,11 +34,11 @@ api.interceptors.response.use(
       // Clear token and redirect to login if unauthorized
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_username');
-      
+
       // Clear cookies
       document.cookie = 'admin_token=; path=/; max-age=0';
       document.cookie = 'admin_username=; path=/; max-age=0';
-      
+
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -48,7 +48,7 @@ api.interceptors.response.use(
 // Helper function to make authenticated fetch API calls
 export const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const token = localStorage.getItem('admin_token');
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'x-admin-token': token }),
@@ -64,11 +64,11 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}): Pro
   if (response.status === 401) {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_username');
-    
+
     // Clear cookies
     document.cookie = 'admin_token=; path=/; max-age=0';
     document.cookie = 'admin_username=; path=/; max-age=0';
-    
+
     window.location.href = '/login';
   }
 
@@ -96,13 +96,8 @@ export interface User {
   last_name: string;
   language_code: string;
   photo_url: string | null;
-  points: number;
-  referral_code: string;
   created_at: string;
   last_active: string;
-  is_banned: boolean;
-  is_premium: boolean;
-  premium_until: string | null;
 }
 
 export interface Pagination {
@@ -167,15 +162,9 @@ export interface DashboardSummary {
   totalUsers: number;
   activeQuizzes: number;
   videoTasks: number;
-  totalPoints: number;
-  taskPoints: {
-    quiz: number;
-    video: number;
-    channel: number;
-    referral: number;
-    spin: number;
-  };
 }
+
+
 
 // Authentication API calls
 export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -184,11 +173,8 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
 };
 
 // User management API calls
-export const getUsers = async (page = 1, limit = 10, showBanned = false, showPremium?: boolean): Promise<UsersResponse> => {
-  let url = `/admin/users?page=${page}&limit=${limit}&banned=${showBanned ? '1' : '0'}`;
-  if (showPremium !== undefined) {
-    url += `&premium=${showPremium ? '1' : '0'}`;
-  }
+export const getUsers = async (page = 1, limit = 10, showBanned = false): Promise<UsersResponse> => {
+  const url = `/admin/users?page=${page}&limit=${limit}&banned=${showBanned ? '1' : '0'}`;
   const response = await api.get(url);
   return response.data;
 };
@@ -196,23 +182,6 @@ export const getUsers = async (page = 1, limit = 10, showBanned = false, showPre
 export const getUserById = async (id: number): Promise<UserDetailResponse> => {
   const response = await api.get(`/admin/users/${id}`);
   return response.data;
-};
-
-export const updateUserPoints = async (id: number, points: number, reason?: string) => {
-  const response = await api.patch(`/admin/users/${id}/points`, { points, reason });
-  return response.data;
-};
-
-// Ban or unban a user
-export const setUserBanned = async (id: number, is_banned: boolean): Promise<User> => {
-  const response = await api.patch(`/admin/users/${id}/ban`, { is_banned });
-  return response.data.user;
-};
-
-// Toggle premium status for a user
-export const setUserPremium = async (id: number, is_premium: boolean, premium_until?: string): Promise<User> => {
-  const response = await api.patch(`/admin/users/${id}/premium`, { is_premium, premium_until });
-  return response.data.user;
 };
 
 // Referrals API calls
@@ -507,7 +476,6 @@ export interface TopUser {
   first_name: string;
   last_name: string;
   photo_url: string | null;
-  points: number;
   completed_tasks_count: number;
   referral_count: number;
 }
@@ -527,7 +495,6 @@ export interface RecentActivity {
   task_type: string | null;
   task_icon?: string;
   description: string;
-  points: number;
   timestamp: string;
 }
 
@@ -556,7 +523,7 @@ export const getRecentActivities = async (
   if (cursor) {
     url += `&cursor=${encodeURIComponent(cursor)}`;
   }
-  
+
   // Add filters if provided
   if (filters) {
     if (filters.type) url += `&type=${encodeURIComponent(filters.type)}`;
@@ -565,7 +532,7 @@ export const getRecentActivities = async (
     if (filters.start_date) url += `&start_date=${encodeURIComponent(filters.start_date)}`;
     if (filters.end_date) url += `&end_date=${encodeURIComponent(filters.end_date)}`;
   }
-  
+
   const response = await api.get(url);
   return response.data;
 };
@@ -1004,37 +971,37 @@ export interface PromotionSubmissionsFilters {
 
 export const getPromotionSubmissions = async (filters?: PromotionSubmissionsFilters): Promise<PromotionSubmissionsResponse> => {
   const params = new URLSearchParams();
-  
+
   if (filters?.status && filters.status !== 'all') {
     params.append('status', filters.status);
   }
-  
+
   if (filters?.platform && filters.platform !== 'all') {
     params.append('platform', filters.platform);
   }
-  
+
   if (filters?.search) {
     params.append('search', filters.search);
   }
-  
+
   if (filters?.limit) {
     params.append('limit', filters.limit.toString());
   }
-  
+
   if (filters?.offset) {
     params.append('offset', filters.offset.toString());
   }
-  
+
   const queryString = params.toString();
   const url = `/admin/promotion-submissions${queryString ? `?${queryString}` : ''}`;
-  
+
   const response = await api.get(url);
-  
+
   // Handle both old format (direct array) and new format (object with submissions)
   if (Array.isArray(response.data)) {
     return { submissions: response.data };
   }
-  
+
   return response.data;
 };
 
@@ -1044,8 +1011,8 @@ export const getPromotionSubmission = async (id: number): Promise<{ submission: 
 };
 
 export const updatePromotionSubmissionStatus = async (
-  id: number, 
-  status: 'approved' | 'rejected', 
+  id: number,
+  status: 'approved' | 'rejected',
   notes?: string,
   reward_amount?: number
 ): Promise<{ submission: PromotionSubmission }> => {
@@ -1141,17 +1108,17 @@ export const getUserPromotion = async (id: number): Promise<PromotionDetailRespo
 };
 
 export const approveUserPromotion = async (
-  id: number, 
-  adminNotes?: string, 
+  id: number,
+  adminNotes?: string,
   validationQuestions?: Array<{
     question: string;
     correct_answer: string;
     wrong_answers: string[];
   }>
 ): Promise<{ message: string; promotion: UserSubmittedPromotion }> => {
-  const response = await api.put(`/admin/user-promotions/${id}/approve`, { 
+  const response = await api.put(`/admin/user-promotions/${id}/approve`, {
     admin_notes: adminNotes,
-    validation_questions: validationQuestions 
+    validation_questions: validationQuestions
   });
   return response.data;
 };
@@ -1327,7 +1294,7 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'created_at' 
   if (token) {
     headers['x-admin-token'] = token;
   }
-  
+
   const response = await fetch(`${API_URL}/admin/courses`, {
     method: 'POST',
     headers,
@@ -1345,7 +1312,7 @@ export const updateCourse = async (id: number, courseData: Partial<Omit<Course, 
   if (token) {
     headers['x-admin-token'] = token;
   }
-  
+
   const response = await fetch(`${API_URL}/admin/courses/${id}`, {
     method: 'PUT',
     headers,
@@ -1534,10 +1501,10 @@ export interface TransactionFilters {
   page?: number;
 }
 
-export const getTransactions = async (filters: TransactionFilters): Promise<{ 
-  transactions: Transaction[]; 
-  statistics: TransactionStatistics; 
-  totalPages: number; 
+export const getTransactions = async (filters: TransactionFilters): Promise<{
+  transactions: Transaction[];
+  statistics: TransactionStatistics;
+  totalPages: number;
 }> => {
   const params = new URLSearchParams({
     type: filters.type,
@@ -1546,7 +1513,7 @@ export const getTransactions = async (filters: TransactionFilters): Promise<{
     search: filters.search,
     page: (filters.page || 1).toString()
   });
-  
+
   const response = await fetchWithAuth(`/admin/transactions?${params}`);
   return response.json();
 };
@@ -1572,7 +1539,7 @@ export const exportTransactions = async (filters: TransactionFilters): Promise<B
     search: filters.search,
     format: 'csv'
   });
-  
+
   const response = await fetchWithAuth(`/admin/transactions/export?${params}`);
   if (!response.ok) throw new Error('Failed to export transactions');
   return response.blob();

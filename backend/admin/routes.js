@@ -3,10 +3,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
 const { adminAuth, checkPermission, superadminOnly, logAdminLogout } = require('./auth');
-const { activityLogger } = require('./middleware/activity-logger');
+// Activity logger removed
 const pool = require('../config/database');
 const { Api } = require('telegram');
-const {createBot} = require('../bot');
+const { createBot } = require('../bot');
 const { getYouTubeVideoInfo, getVideoDurationInSeconds } = require('../youtube');
 const multer = require('multer');
 const path = require('path');
@@ -40,7 +40,7 @@ const upload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -75,8 +75,8 @@ const affiliateTasksRouter = require('./affiliate-tasks');
 const coursesRouter = require('./courses');
 const localAdsRouter = require('./local-ads');
 const flowsRouter = require('./flows');
-const activityLogsModule = require('./activity-logs');
-const adminUsersRouter = require('./admin-users');
+// Activity logs module removed
+// Admin users router removed
 const userRequestsRouter = require('./user-requests');
 const inboxRouter = require('./inbox');
 const moderationRouter = require('./moderation');
@@ -86,11 +86,11 @@ router.use('/affiliate-tasks', affiliateTasksRouter);
 router.use('/courses', coursesRouter);
 router.use('/local-ads', localAdsRouter);
 router.use('/flows', flowsRouter);
-router.use('/staff', adminUsersRouter); // Admin users management
+// router.use('/staff', adminUsersRouter); // Admin users management removed
 router.use('/user-requests', userRequestsRouter); // Admin inbox for user requests
 router.use('/inbox', inboxRouter); // Full conversation inbox
 router.use('/moderation', moderationRouter); // Group/Channel management
-router.use('/', activityLogsModule.router); // Activity logs routes
+// router.use('/', activityLogsModule.router); // Activity logs routes removed
 
 // Helper: send message/photo/video to a single user
 const sendBotBroadcast = async (userId, payload) => {
@@ -544,7 +544,7 @@ router.post('/logout', adminAuth, async (req, res) => {
         req.headers['x-forwarded-for'] || req.connection.remoteAddress
       );
     }
-    
+
     res.json({ message: 'Logout successful' });
   } catch (error) {
     console.error('Admin logout error:', error);
@@ -560,23 +560,23 @@ router.get('/users', adminAuth, async (req, res) => {
     const offset = (page - 1) * limit;
     const banned = req.query.banned === '1';
     const premium = req.query.premium;
-    
+
     let whereClause = 'WHERE is_banned = $1';
     let params = [banned];
     let paramIndex = 2;
-    
+
     // Add premium filter if specified
     if (premium !== undefined) {
       whereClause += ` AND is_premium = $${paramIndex}`;
       params.push(premium === '1');
       paramIndex++;
     }
-    
+
     // Add limit and offset
     params.push(limit, offset);
     const limitParam = paramIndex;
     const offsetParam = paramIndex + 1;
-    
+
     // Get users with pagination
     const usersResult = await pool.query(
       `SELECT 
@@ -588,7 +588,7 @@ router.get('/users', adminAuth, async (req, res) => {
       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params
     );
-    
+
     // Get total count with same filters
     let countParams = [banned];
     let countWhereClause = 'WHERE is_banned = $1';
@@ -596,9 +596,9 @@ router.get('/users', adminAuth, async (req, res) => {
       countWhereClause += ' AND is_premium = $2';
       countParams.push(premium === '1');
     }
-    
+
     const countResult = await pool.query(`SELECT COUNT(*) FROM telegram_users ${countWhereClause}`, countParams);
-    
+
     res.json({
       users: usersResult.rows,
       pagination: {
@@ -620,7 +620,7 @@ router.get('/referrals', adminAuth, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
-    
+
     // Get referrals with pagination
     const referralsResult = await pool.query(
       `SELECT 
@@ -647,10 +647,10 @@ router.get('/referrals', adminAuth, async (req, res) => {
       LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    
+
     // Get total count
     const countResult = await pool.query('SELECT COUNT(*) FROM referrals');
-    
+
     res.json({
       referrals: referralsResult.rows,
       pagination: {
@@ -670,7 +670,7 @@ router.get('/referrals', adminAuth, async (req, res) => {
 router.get('/referrals/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const referralResult = await pool.query(
       `SELECT 
         r.id, r.created_at, r.points_awarded,
@@ -697,11 +697,11 @@ router.get('/referrals/:id', adminAuth, async (req, res) => {
       WHERE r.id = $1`,
       [id]
     );
-    
+
     if (referralResult.rows.length === 0) {
       return res.status(404).json({ message: 'Referral not found' });
     }
-    
+
     res.json({
       referral: referralResult.rows[0]
     });
@@ -715,17 +715,17 @@ router.get('/referrals/:id', adminAuth, async (req, res) => {
 router.get('/users/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get user details
     const userResult = await pool.query(
       `SELECT * FROM user_statistics WHERE id = $1`,
       [id]
     );
-    
+
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     // Get user's completed tasks
     const tasksResult = await pool.query(
       `SELECT t.id, t.type, t.description, ut.completed_at, ut.points_awarded
@@ -736,7 +736,7 @@ router.get('/users/:id', adminAuth, async (req, res) => {
        LIMIT 10`,
       [id]
     );
-    
+
     // Get user's referrals
     const referralsResult = await pool.query(
       `SELECT 
@@ -751,7 +751,7 @@ router.get('/users/:id', adminAuth, async (req, res) => {
        LIMIT 10`,
       [id]
     );
-    
+
     res.json({
       user: userResult.rows[0],
       tasks: tasksResult.rows,
@@ -766,66 +766,63 @@ router.get('/users/:id', adminAuth, async (req, res) => {
 // Update user points manually
 router.patch('/users/:id/points',
   adminAuth,
-  activityLogger('adjust_points', 'user', 'id', (req) => ({
-    points_change: req.body.points,
-    reason: req.body.reason
-  })),
+  // Activity logger removed
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { points, reason } = req.body;
+    try {
+      const { id } = req.params;
+      const { points, reason } = req.body;
 
-    if (!points || isNaN(points)) {
-      return res.status(400).json({ message: 'Valid points value required' });
-    }
+      if (!points || isNaN(points)) {
+        return res.status(400).json({ message: 'Valid points value required' });
+      }
 
-    // Get user's current points before update
-    const userResult = await pool.query(
-      'SELECT points FROM telegram_users WHERE id = $1',
-      [id]
-    );
+      // Get user's current points before update
+      const userResult = await pool.query(
+        'SELECT points FROM telegram_users WHERE id = $1',
+        [id]
+      );
 
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
 
-    const balanceBefore = userResult.rows[0].points || 0;
+      const balanceBefore = userResult.rows[0].points || 0;
 
-    // Update user points using the stored function
-    const result = await pool.query(
-      'SELECT add_points_to_user($1, $2) as new_points',
-      [id, points]
-    );
+      // Update user points using the stored function
+      const result = await pool.query(
+        'SELECT add_points_to_user($1, $2) as new_points',
+        [id, points]
+      );
 
-    const balanceAfter = result.rows[0].new_points;
+      const balanceAfter = result.rows[0].new_points;
 
-    // Log the points adjustment to enhanced_transaction_logs
-    await pool.query(
-      `INSERT INTO enhanced_transaction_logs
+      // Log the points adjustment to enhanced_transaction_logs
+      await pool.query(
+        `INSERT INTO enhanced_transaction_logs
         (user_id, transaction_type, amount, balance_before, balance_after, description, admin_user_id, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        id,
-        points > 0 ? 'admin_credit' : 'admin_debit',
-        points,
-        balanceBefore,
-        balanceAfter,
-        reason || `Manual balance adjustment by admin`,
-        req.adminUser?.id || null,
-        JSON.stringify({ adjusted_by: req.adminUser?.username || 'admin' })
-      ]
-    );
+        [
+          id,
+          points > 0 ? 'admin_credit' : 'admin_debit',
+          points,
+          balanceBefore,
+          balanceAfter,
+          reason || `Manual balance adjustment by admin`,
+          req.adminUser?.id || null,
+          JSON.stringify({ adjusted_by: req.adminUser?.username || 'admin' })
+        ]
+      );
 
-    res.json({
-      message: 'Points updated successfully',
-      newPoints: balanceAfter,
-      updated: true
-    });
-  } catch (error) {
-    console.error('Error updating points:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+      res.json({
+        message: 'Points updated successfully',
+        newPoints: balanceAfter,
+        updated: true
+      });
+    } catch (error) {
+      console.error('Error updating points:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 // Ban or unban a user
 router.patch('/users/:id/ban',
@@ -834,25 +831,25 @@ router.patch('/users/:id/ban',
     action: req.body.is_banned ? 'banned' : 'unbanned'
   })),
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { is_banned } = req.body;
-    if (typeof is_banned !== 'boolean') {
-      return res.status(400).json({ message: 'is_banned must be a boolean' });
+    try {
+      const { id } = req.params;
+      const { is_banned } = req.body;
+      if (typeof is_banned !== 'boolean') {
+        return res.status(400).json({ message: 'is_banned must be a boolean' });
+      }
+      const result = await pool.query(
+        'UPDATE telegram_users SET is_banned = $1 WHERE id = $2 RETURNING *',
+        [is_banned, id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      res.json({ user: result.rows[0], message: is_banned ? 'User banned' : 'User unbanned' });
+    } catch (error) {
+      console.error('Error banning/unbanning user:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-    const result = await pool.query(
-      'UPDATE telegram_users SET is_banned = $1 WHERE id = $2 RETURNING *',
-      [is_banned, id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json({ user: result.rows[0], message: is_banned ? 'User banned' : 'User unbanned' });
-  } catch (error) {
-    console.error('Error banning/unbanning user:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Toggle premium status for a user
 router.patch('/users/:id/premium',
@@ -862,42 +859,42 @@ router.patch('/users/:id/premium',
     premium_until: req.body.premium_until
   })),
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { is_premium, premium_until } = req.body;
-    
-    if (typeof is_premium !== 'boolean') {
-      return res.status(400).json({ message: 'is_premium must be a boolean' });
+    try {
+      const { id } = req.params;
+      const { is_premium, premium_until } = req.body;
+
+      if (typeof is_premium !== 'boolean') {
+        return res.status(400).json({ message: 'is_premium must be a boolean' });
+      }
+
+      let query, params;
+
+      if (is_premium) {
+        // If enabling premium, set premium_until to 30 days from now if not provided
+        const until = premium_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        query = 'UPDATE telegram_users SET is_premium = $1, premium_until = $2 WHERE id = $3 RETURNING *';
+        params = [true, until, id];
+      } else {
+        // If disabling premium, clear premium_until
+        query = 'UPDATE telegram_users SET is_premium = $1, premium_until = NULL WHERE id = $2 RETURNING *';
+        params = [false, id];
+      }
+
+      const result = await pool.query(query, params);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        user: result.rows[0],
+        message: is_premium ? 'Premium enabled' : 'Premium disabled'
+      });
+    } catch (error) {
+      console.error('Error toggling premium status:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-    
-    let query, params;
-    
-    if (is_premium) {
-      // If enabling premium, set premium_until to 30 days from now if not provided
-      const until = premium_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      query = 'UPDATE telegram_users SET is_premium = $1, premium_until = $2 WHERE id = $3 RETURNING *';
-      params = [true, until, id];
-    } else {
-      // If disabling premium, clear premium_until
-      query = 'UPDATE telegram_users SET is_premium = $1, premium_until = NULL WHERE id = $2 RETURNING *';
-      params = [false, id];
-    }
-    
-    const result = await pool.query(query, params);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    res.json({ 
-      user: result.rows[0], 
-      message: is_premium ? 'Premium enabled' : 'Premium disabled' 
-    });
-  } catch (error) {
-    console.error('Error toggling premium status:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Ensure table exists (run this in setup-db or migration in production)
 // CREATE TABLE youtube_tasks (
@@ -946,77 +943,77 @@ router.post('/youtube-tasks',
     question_count: req.body.questions?.length || 0
   })),
   async (req, res) => {
-  try {
-    const { youtube_url, expires_at, questions, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit } = req.body;
-    if (!youtube_url) return res.status(400).json({ message: 'YouTube URL required' });
-    
-    // Extract video ID (YouTube or TikTok)
-    const youtubeMatch = youtube_url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{11})/);
-    const tiktokMatch = youtube_url.match(/(?:tiktok\.com\/.*\/video\/|vm\.tiktok\.com\/|t\.tiktok\.com\/)([\w]+)/);
-
-    if (!youtubeMatch && !tiktokMatch) {
-      return res.status(400).json({ message: 'Invalid YouTube or TikTok URL' });
-    }
-
-    const videoId = youtubeMatch ? youtubeMatch[1] : tiktokMatch[1];
-    const id = videoId;
-    
-    // Start a transaction
-    const client = await pool.connect();
-    
     try {
-      await client.query('BEGIN');
-      
-      // Use our YouTube module to get video info
-      const videoInfo = await getYouTubeVideoInfo(id);
-      
-      // Convert ISO duration to seconds
-      const videoDurationSecs = getVideoDurationInSeconds(videoInfo.duration_seconds);
-      
-      // Insert task with video info and requirement fields
-      const taskResult = await client.query(
-        'INSERT INTO youtube_tasks (youtube_url, title, thumbnail, expires_at, video_duration, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-        [youtube_url, videoInfo.title, videoInfo.thumbnail, expires_at || null, videoDurationSecs, require_finish_task_id || null, require_finish_task_type || null, require_premium || false, vpn_countries || [], completion_limit || null]
-      );
-      
-      const task = taskResult.rows[0];
-      
-      // If questions are provided, add them to youtube_questions
-      const addedQuestions = [];
-      if (questions && Array.isArray(questions) && questions.length > 0) {
-        for (const q of questions) {
-          if (q.question && q.correct_answer) {
-            const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers : 
-                                     (q.wrong_answers ? [q.wrong_answers] : []);
-            
-            const questionResult = await client.query(
-              'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
-              [task.id, q.question, q.correct_answer, wrongAnswersArray]
-            );
-            
-            addedQuestions.push(questionResult.rows[0]);
+      const { youtube_url, expires_at, questions, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit } = req.body;
+      if (!youtube_url) return res.status(400).json({ message: 'YouTube URL required' });
+
+      // Extract video ID (YouTube or TikTok)
+      const youtubeMatch = youtube_url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{11})/);
+      const tiktokMatch = youtube_url.match(/(?:tiktok\.com\/.*\/video\/|vm\.tiktok\.com\/|t\.tiktok\.com\/)([\w]+)/);
+
+      if (!youtubeMatch && !tiktokMatch) {
+        return res.status(400).json({ message: 'Invalid YouTube or TikTok URL' });
+      }
+
+      const videoId = youtubeMatch ? youtubeMatch[1] : tiktokMatch[1];
+      const id = videoId;
+
+      // Start a transaction
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // Use our YouTube module to get video info
+        const videoInfo = await getYouTubeVideoInfo(id);
+
+        // Convert ISO duration to seconds
+        const videoDurationSecs = getVideoDurationInSeconds(videoInfo.duration_seconds);
+
+        // Insert task with video info and requirement fields
+        const taskResult = await client.query(
+          'INSERT INTO youtube_tasks (youtube_url, title, thumbnail, expires_at, video_duration, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+          [youtube_url, videoInfo.title, videoInfo.thumbnail, expires_at || null, videoDurationSecs, require_finish_task_id || null, require_finish_task_type || null, require_premium || false, vpn_countries || [], completion_limit || null]
+        );
+
+        const task = taskResult.rows[0];
+
+        // If questions are provided, add them to youtube_questions
+        const addedQuestions = [];
+        if (questions && Array.isArray(questions) && questions.length > 0) {
+          for (const q of questions) {
+            if (q.question && q.correct_answer) {
+              const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers :
+                (q.wrong_answers ? [q.wrong_answers] : []);
+
+              const questionResult = await client.query(
+                'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
+                [task.id, q.question, q.correct_answer, wrongAnswersArray]
+              );
+
+              addedQuestions.push(questionResult.rows[0]);
+            }
           }
         }
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+          task: task,
+          questions: addedQuestions
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error fetching YouTube video info:', error);
+        res.status(400).json({ message: 'Failed to fetch YouTube video info: ' + error.message });
+      } finally {
+        client.release();
       }
-      
-      await client.query('COMMIT');
-      
-      res.status(201).json({ 
-        task: task,
-        questions: addedQuestions
-      });
     } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error fetching YouTube video info:', error);
-      res.status(400).json({ message: 'Failed to fetch YouTube video info: ' + error.message });
-    } finally {
-      client.release();
+      console.error('Error adding YouTube task:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-  } catch (error) {
-    console.error('Error adding YouTube task:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Update/expire/disable a YouTube video task
 router.patch('/youtube-tasks/:id',
@@ -1027,102 +1024,102 @@ router.patch('/youtube-tasks/:id',
     expires_at: req.body.expires_at
   })),
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { expires_at, disabled, video_duration, questions, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit } = req.body;
-    
-    // Start a transaction
-    const client = await pool.connect();
-    
     try {
-      await client.query('BEGIN');
-      
-      // Update the task
-      const taskResult = await client.query(
-        'UPDATE youtube_tasks SET expires_at = COALESCE($1, expires_at), disabled = COALESCE($2, disabled), video_duration = COALESCE($3, video_duration), require_finish_task_id = COALESCE($4, require_finish_task_id), require_finish_task_type = COALESCE($5, require_finish_task_type), require_premium = COALESCE($6, require_premium), vpn_countries = COALESCE($7, vpn_countries), completion_limit = COALESCE($8, completion_limit) WHERE id = $9 RETURNING *',
-        [expires_at, disabled, video_duration, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit, id]
-      );
-      
-      if (taskResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ message: 'Task not found' });
-      }
-      
-      const task = taskResult.rows[0];
-      
-      // Handle questions update if provided
-      let updatedQuestions = [];
-      if (questions !== undefined) {
-        // Get existing questions from DB
-        const existingQuestionsRes = await client.query('SELECT id FROM youtube_questions WHERE youtube_task_id = $1', [id]);
-        const existingIds = existingQuestionsRes.rows.map(q => q.id);
-        // Get IDs from new questions array (if present)
-        const newIds = Array.isArray(questions) ? questions.map(q => q.id).filter(Boolean) : [];
-        // Delete questions that exist in DB but not in new array
-        const idsToDelete = existingIds.filter(qid => !newIds.includes(qid));
-        if (idsToDelete.length > 0) {
-          // First delete any question responses for these questions
-          await client.query(`DELETE FROM youtube_question_responses WHERE question_id = ANY($1::int[])`, [idsToDelete]);
-          // Then delete the questions
-          await client.query(`DELETE FROM youtube_questions WHERE id = ANY($1::int[])`, [idsToDelete]);
+      const { id } = req.params;
+      const { expires_at, disabled, video_duration, questions, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit } = req.body;
+
+      // Start a transaction
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        // Update the task
+        const taskResult = await client.query(
+          'UPDATE youtube_tasks SET expires_at = COALESCE($1, expires_at), disabled = COALESCE($2, disabled), video_duration = COALESCE($3, video_duration), require_finish_task_id = COALESCE($4, require_finish_task_id), require_finish_task_type = COALESCE($5, require_finish_task_type), require_premium = COALESCE($6, require_premium), vpn_countries = COALESCE($7, vpn_countries), completion_limit = COALESCE($8, completion_limit) WHERE id = $9 RETURNING *',
+          [expires_at, disabled, video_duration, require_finish_task_id, require_finish_task_type, require_premium, vpn_countries, completion_limit, id]
+        );
+
+        if (taskResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ message: 'Task not found' });
         }
-        // Upsert new questions
-        if (Array.isArray(questions) && questions.length > 0) {
-          for (const q of questions) {
-            const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers : (q.wrong_answers ? [q.wrong_answers] : []);
-            if (q.id) {
-              // Update existing question
-              await client.query(
-                'UPDATE youtube_questions SET question = $1, correct_answer = $2, wrong_answers = $3 WHERE id = $4',
-                [q.question, q.correct_answer, wrongAnswersArray, q.id]
-              );
-            } else if (q.question && q.correct_answer) {
-              // Insert new question
-              const questionResult = await client.query(
-                'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
-                [id, q.question, q.correct_answer, wrongAnswersArray]
-              );
-              updatedQuestions.push(questionResult.rows[0]);
+
+        const task = taskResult.rows[0];
+
+        // Handle questions update if provided
+        let updatedQuestions = [];
+        if (questions !== undefined) {
+          // Get existing questions from DB
+          const existingQuestionsRes = await client.query('SELECT id FROM youtube_questions WHERE youtube_task_id = $1', [id]);
+          const existingIds = existingQuestionsRes.rows.map(q => q.id);
+          // Get IDs from new questions array (if present)
+          const newIds = Array.isArray(questions) ? questions.map(q => q.id).filter(Boolean) : [];
+          // Delete questions that exist in DB but not in new array
+          const idsToDelete = existingIds.filter(qid => !newIds.includes(qid));
+          if (idsToDelete.length > 0) {
+            // First delete any question responses for these questions
+            await client.query(`DELETE FROM youtube_question_responses WHERE question_id = ANY($1::int[])`, [idsToDelete]);
+            // Then delete the questions
+            await client.query(`DELETE FROM youtube_questions WHERE id = ANY($1::int[])`, [idsToDelete]);
+          }
+          // Upsert new questions
+          if (Array.isArray(questions) && questions.length > 0) {
+            for (const q of questions) {
+              const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers : (q.wrong_answers ? [q.wrong_answers] : []);
+              if (q.id) {
+                // Update existing question
+                await client.query(
+                  'UPDATE youtube_questions SET question = $1, correct_answer = $2, wrong_answers = $3 WHERE id = $4',
+                  [q.question, q.correct_answer, wrongAnswersArray, q.id]
+                );
+              } else if (q.question && q.correct_answer) {
+                // Insert new question
+                const questionResult = await client.query(
+                  'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
+                  [id, q.question, q.correct_answer, wrongAnswersArray]
+                );
+                updatedQuestions.push(questionResult.rows[0]);
+              }
             }
           }
+          // Get all updated questions
+          const questionsResult = await client.query('SELECT * FROM youtube_questions WHERE youtube_task_id = $1', [id]);
+          updatedQuestions = questionsResult.rows;
         }
-        // Get all updated questions
-        const questionsResult = await client.query('SELECT * FROM youtube_questions WHERE youtube_task_id = $1', [id]);
-        updatedQuestions = questionsResult.rows;
+
+        await client.query('COMMIT');
+
+        // Get the questions if not explicitly updated
+        if (questions === undefined) {
+          const questionsResult = await pool.query(
+            'SELECT * FROM youtube_questions WHERE youtube_task_id = $1',
+            [id]
+          );
+          updatedQuestions = questionsResult.rows;
+        }
+
+        res.json({
+          task: task,
+          questions: updatedQuestions
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      
-      await client.query('COMMIT');
-      
-      // Get the questions if not explicitly updated
-      if (questions === undefined) {
-        const questionsResult = await pool.query(
-          'SELECT * FROM youtube_questions WHERE youtube_task_id = $1',
-          [id]
-        );
-        updatedQuestions = questionsResult.rows;
-      }
-      
-      res.json({ 
-        task: task,
-        questions: updatedQuestions
-      });
     } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      console.error('Error updating YouTube task:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-  } catch (error) {
-    console.error('Error updating YouTube task:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Get YouTube task with questions
 router.get('/youtube-tasks/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get task details
     const taskResult = await pool.query(
       `SELECT yt.*, 
@@ -1132,17 +1129,17 @@ router.get('/youtube-tasks/:id', adminAuth, async (req, res) => {
        WHERE yt.id = $1`,
       [id]
     );
-    
+
     if (taskResult.rows.length === 0) {
       return res.status(404).json({ message: 'Task not found' });
     }
-    
+
     // Get questions if exists
     const questionsResult = await pool.query(
       'SELECT * FROM youtube_questions WHERE youtube_task_id = $1',
       [id]
     );
-    
+
     // Get completion details
     const completionsResult = await pool.query(
       `SELECT 
@@ -1156,7 +1153,7 @@ router.get('/youtube-tasks/:id', adminAuth, async (req, res) => {
        LIMIT 100`,
       [id]
     );
-    
+
     res.json({
       task: taskResult.rows[0],
       questions: questionsResult.rows,
@@ -1172,16 +1169,16 @@ router.get('/youtube-tasks/:id', adminAuth, async (req, res) => {
 router.post('/youtube-tasks/:id/refresh-info', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get the task
     const taskResult = await pool.query('SELECT youtube_url FROM youtube_tasks WHERE id = $1', [id]);
-    
+
     if (taskResult.rows.length === 0) {
       return res.status(404).json({ message: 'Task not found' });
     }
-    
+
     const youtube_url = taskResult.rows[0].youtube_url;
-    
+
     // Extract video ID (YouTube or TikTok)
     const youtubeMatch = youtube_url.match(/(?:v=|youtu\.be\/|\/shorts\/)([\w-]{11})/);
     const tiktokMatch = youtube_url.match(/(?:tiktok\.com\/.*\/video\/|vm\.tiktok\.com\/|t\.tiktok\.com\/)([\w]+)/);
@@ -1191,17 +1188,17 @@ router.post('/youtube-tasks/:id/refresh-info', adminAuth, async (req, res) => {
     }
 
     const videoId = youtubeMatch ? youtubeMatch[1] : tiktokMatch[1];
-    
+
     // Get updated info from YouTube API (only works for YouTube videos)
     try {
       if (!youtubeMatch) {
         return res.status(400).json({ message: 'Refresh info only available for YouTube videos' });
       }
       const videoInfo = await getYouTubeVideoInfo(videoId);
-      
+
       // Convert ISO duration to seconds
       const videoDurationSecs = getVideoDurationInSeconds(videoInfo.duration_seconds);
-      
+
       // Update the task with fresh information
       const updateResult = await pool.query(
         `UPDATE youtube_tasks 
@@ -1213,10 +1210,10 @@ router.post('/youtube-tasks/:id/refresh-info', adminAuth, async (req, res) => {
          RETURNING *`,
         [videoInfo.title, videoInfo.thumbnail, videoDurationSecs, id]
       );
-      
-      res.json({ 
+
+      res.json({
         message: 'Video info refreshed successfully',
-        task: updateResult.rows[0] 
+        task: updateResult.rows[0]
       });
     } catch (error) {
       console.error('Error fetching YouTube video info:', error);
@@ -1251,7 +1248,7 @@ router.get('/telegram-channels', adminAuth, async (req, res) => {
 router.get('/telegram-channels/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get channel details
     const channelResult = await pool.query(
       `SELECT c.*, 
@@ -1261,11 +1258,11 @@ router.get('/telegram-channels/:id', adminAuth, async (req, res) => {
        WHERE c.id = $1`,
       [id]
     );
-    
+
     if (channelResult.rows.length === 0) {
       return res.status(404).json({ message: 'Channel not found' });
     }
-    
+
     // Get join details
     const joinsResult = await pool.query(
       `SELECT 
@@ -1278,7 +1275,7 @@ router.get('/telegram-channels/:id', adminAuth, async (req, res) => {
        LIMIT 100`,
       [id]
     );
-    
+
     res.json({
       channel: channelResult.rows[0],
       joins: joinsResult.rows
@@ -1297,126 +1294,126 @@ router.post('/telegram-channels',
     require_premium: req.body.require_premium || false
   })),
   async (req, res) => {
-  try {
-    let { link, expires_at, require_premium } = req.body;
-    if (!link) {
-      return res.status(400).json({ message: 'Channel link is required' });
-    }
-
-    // Clean and standardize the link format
-    link = link.trim();
-    
-    // Extract username/channel ID from different link formats
-    let channelIdentifier = '';
-    if (link.includes('t.me/')) {
-      // Handle t.me links
-      const path = link.split('t.me/')[1].split('?')[0].split('/')[0];
-      // Handle private links (https://t.me/+hash)
-      if (path.startsWith('+')) {
-        channelIdentifier = path; // Keep the + prefix for private links
-      } else {
-        channelIdentifier = path;
-      }
-    } else if (link.startsWith('@')) {
-      // Handle @username format
-      channelIdentifier = link.substring(1);
-    } else if (link.startsWith('https://telegram.me/')) {
-      // Handle telegram.me links
-      const path = link.split('telegram.me/')[1].split('?')[0].split('/')[0];
-      // Handle private links (https://telegram.me/+hash)
-      if (path.startsWith('+')) {
-        channelIdentifier = path; // Keep the + prefix for private links
-      } else {
-        channelIdentifier = path;
-      }
-    } else if (link.match(/^-100\d+$/)) {
-      // Handle channel ID format (e.g., -1002490210049)
-      channelIdentifier = link;
-    } else {
-      // Assume it's a direct username or channel ID
-      channelIdentifier = link;
-    }
-
-    // Remove any trailing slashes or parameters
-    channelIdentifier = channelIdentifier.replace(/\/+$/, '');
-    const bot = await createBot();
-
     try {
-      // Start bot if not already started
-      if (!bot.isReady) {
-        await bot.start();
+      let { link, expires_at, require_premium } = req.body;
+      if (!link) {
+        return res.status(400).json({ message: 'Channel link is required' });
       }
 
-      // Get channel info using the new method
-      const channelInfo = await bot.getChannelInfo(channelIdentifier);
+      // Clean and standardize the link format
+      link = link.trim();
 
-      // Handle private channels (no username) vs public channels
-      let channelName, standardLink, displayName;
-      let isPublic = false;
-      
-      if (channelInfo.username) {
-        // Public channel with username
-        channelName = channelInfo.username;
-        displayName = channelInfo.title;
-        standardLink = `https://t.me/${channelInfo.username}`;
-        isPublic = true;
-      } else {
-        // Private channel - use the original link or create a private link format
-        channelName = channelIdentifier; // Use the identifier (e.g., +hash or -1001234567890)
-        displayName = channelInfo.title; // Use the title for display
-        isPublic = false;
-        // For channel IDs, create a proper link format
-        if (channelIdentifier.match(/^-100\d+$/)) {
-          standardLink = `https://t.me/c/${channelIdentifier.substring(4)}/1`; // Remove -100 prefix
+      // Extract username/channel ID from different link formats
+      let channelIdentifier = '';
+      if (link.includes('t.me/')) {
+        // Handle t.me links
+        const path = link.split('t.me/')[1].split('?')[0].split('/')[0];
+        // Handle private links (https://t.me/+hash)
+        if (path.startsWith('+')) {
+          channelIdentifier = path; // Keep the + prefix for private links
         } else {
-          standardLink = link; // Keep the original link for other private channels
+          channelIdentifier = path;
         }
+      } else if (link.startsWith('@')) {
+        // Handle @username format
+        channelIdentifier = link.substring(1);
+      } else if (link.startsWith('https://telegram.me/')) {
+        // Handle telegram.me links
+        const path = link.split('telegram.me/')[1].split('?')[0].split('/')[0];
+        // Handle private links (https://telegram.me/+hash)
+        if (path.startsWith('+')) {
+          channelIdentifier = path; // Keep the + prefix for private links
+        } else {
+          channelIdentifier = path;
+        }
+      } else if (link.match(/^-100\d+$/)) {
+        // Handle channel ID format (e.g., -1002490210049)
+        channelIdentifier = link;
+      } else {
+        // Assume it's a direct username or channel ID
+        channelIdentifier = link;
       }
 
-      // Check if channel already exists
-      const existingChannel = await pool.query(
-        'SELECT id FROM telegram_channels WHERE name = $1',
-        [channelName]
-      );
+      // Remove any trailing slashes or parameters
+      channelIdentifier = channelIdentifier.replace(/\/+$/, '');
+      const bot = await createBot();
 
-      if (existingChannel.rows.length > 0) {
-        return res.status(400).json({ message: 'Channel already exists' });
-      }
+      try {
+        // Start bot if not already started
+        if (!bot.isReady) {
+          await bot.start();
+        }
 
-      // Insert channel with verified information
-      const result = await pool.query(
-        `INSERT INTO telegram_channels
+        // Get channel info using the new method
+        const channelInfo = await bot.getChannelInfo(channelIdentifier);
+
+        // Handle private channels (no username) vs public channels
+        let channelName, standardLink, displayName;
+        let isPublic = false;
+
+        if (channelInfo.username) {
+          // Public channel with username
+          channelName = channelInfo.username;
+          displayName = channelInfo.title;
+          standardLink = `https://t.me/${channelInfo.username}`;
+          isPublic = true;
+        } else {
+          // Private channel - use the original link or create a private link format
+          channelName = channelIdentifier; // Use the identifier (e.g., +hash or -1001234567890)
+          displayName = channelInfo.title; // Use the title for display
+          isPublic = false;
+          // For channel IDs, create a proper link format
+          if (channelIdentifier.match(/^-100\d+$/)) {
+            standardLink = `https://t.me/c/${channelIdentifier.substring(4)}/1`; // Remove -100 prefix
+          } else {
+            standardLink = link; // Keep the original link for other private channels
+          }
+        }
+
+        // Check if channel already exists
+        const existingChannel = await pool.query(
+          'SELECT id FROM telegram_channels WHERE name = $1',
+          [channelName]
+        );
+
+        if (existingChannel.rows.length > 0) {
+          return res.status(400).json({ message: 'Channel already exists' });
+        }
+
+        // Insert channel with verified information
+        const result = await pool.query(
+          `INSERT INTO telegram_channels
           (name, title, link, is_public, is_private, disabled, expires_at, require_premium, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          RETURNING *`,
-        [
-          channelName,
-          displayName,
-          standardLink,
-          isPublic,
-          !isPublic, // is_private
-          false, // disabled
-          expires_at || null,
-          require_premium || false
-        ]
-      );
+          [
+            channelName,
+            displayName,
+            standardLink,
+            isPublic,
+            !isPublic, // is_private
+            false, // disabled
+            expires_at || null,
+            require_premium || false
+          ]
+        );
 
-      res.json({ 
-        message: 'Channel added successfully',
-        channel: result.rows[0]
-      });
+        res.json({
+          message: 'Channel added successfully',
+          channel: result.rows[0]
+        });
+      } catch (error) {
+        console.error('Error getting channel info:', error);
+        const botUsername = process.env.BOT_USERNAME || 'your_bot';
+        res.status(400).json({
+          message: error.message || `Failed to verify channel. Make sure @${botUsername} is added as an admin of the channel and the channel exists.`
+        });
+      }
     } catch (error) {
-      console.error('Error getting channel info:', error);
-      const botUsername = process.env.BOT_USERNAME || 'your_bot';
-      res.status(400).json({ 
-        message: error.message || `Failed to verify channel. Make sure @${botUsername} is added as an admin of the channel and the channel exists.`
-      });
+      console.error('Error adding telegram channel:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-  } catch (error) {
-    console.error('Error adding telegram channel:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Edit/disable/enable a channel
 router.patch('/telegram-channels/:id',
@@ -1427,51 +1424,51 @@ router.patch('/telegram-channels/:id',
     expires_at: req.body.expires_at
   })),
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { disabled, expires_at, require_finish_task_id, require_finish_task_type, require_premium } = req.body;
-    const result = await pool.query(
-      'UPDATE telegram_channels SET disabled = COALESCE($1, disabled), expires_at = $2, require_finish_task_id = COALESCE($3, require_finish_task_id), require_finish_task_type = COALESCE($4, require_finish_task_type), require_premium = COALESCE($5, require_premium) WHERE id = $6 RETURNING *',
-      [disabled, expires_at, require_finish_task_id, require_finish_task_type, require_premium, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Channel not found' });
-    res.json({ channel: result.rows[0] });
-  } catch (error) {
-    console.error('Error updating channel:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    try {
+      const { id } = req.params;
+      const { disabled, expires_at, require_finish_task_id, require_finish_task_type, require_premium } = req.body;
+      const result = await pool.query(
+        'UPDATE telegram_channels SET disabled = COALESCE($1, disabled), expires_at = $2, require_finish_task_id = COALESCE($3, require_finish_task_id), require_finish_task_type = COALESCE($4, require_finish_task_type), require_premium = COALESCE($5, require_premium) WHERE id = $6 RETURNING *',
+        [disabled, expires_at, require_finish_task_id, require_finish_task_type, require_premium, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: 'Channel not found' });
+      res.json({ channel: result.rows[0] });
+    } catch (error) {
+      console.error('Error updating channel:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
 
 // Delete a channel
 router.delete('/telegram-channels/:id',
   adminAuth,
   activityLogger('delete', 'telegram_channel', 'id'),
   async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Check if channel exists
-    const channelResult = await pool.query(
-      'SELECT id, name FROM telegram_channels WHERE id = $1',
-      [id]
-    );
-    
-    if (channelResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Channel not found' });
+    try {
+      const { id } = req.params;
+
+      // Check if channel exists
+      const channelResult = await pool.query(
+        'SELECT id, name FROM telegram_channels WHERE id = $1',
+        [id]
+      );
+
+      if (channelResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Channel not found' });
+      }
+
+      // Delete related records first (to avoid foreign key constraint errors)
+      await pool.query('DELETE FROM channel_membership_verifications WHERE channel_id = $1', [id]);
+
+      // Delete the channel
+      await pool.query('DELETE FROM telegram_channels WHERE id = $1', [id]);
+
+      res.json({ message: 'Channel deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting channel:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    // Delete related records first (to avoid foreign key constraint errors)
-    await pool.query('DELETE FROM channel_membership_verifications WHERE channel_id = $1', [id]);
-
-    // Delete the channel
-    await pool.query('DELETE FROM telegram_channels WHERE id = $1', [id]);
-
-    res.json({ message: 'Channel deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting channel:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 // Dashboard summary endpoint
 router.get('/dashboard-summary', adminAuth, async (req, res) => {
@@ -1530,14 +1527,14 @@ router.get('/recent-activities', adminAuth, async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(50, parseInt(req.query.limit) || 20));
     const cursor = req.query.cursor ? new Date(req.query.cursor) : null;
-    
+
     // Filter parameters
     const activityType = req.query.type; // 'task', 'custom_quiz', 'referral', 'spin'
     const taskType = req.query.task_type; // 'channel_join', 'video_watch', 'quiz', 'custom_quiz', 'referral', 'spin'
     const userId = req.query.user_id ? parseInt(req.query.user_id) : null;
     const startDate = req.query.start_date ? new Date(req.query.start_date) : null;
     const endDate = req.query.end_date ? new Date(req.query.end_date) : null;
-    
+
     // Build base query with static filters that don't need parameters
     let query = `
       WITH all_activities AS (
@@ -1729,11 +1726,11 @@ router.get('/recent-activities', adminAuth, async (req, res) => {
     const activities = result.rows.map(activity => ({
       ...activity,
       task_icon: activity.task_type === 'channel_join' ? '📢' :
-                 activity.task_type === 'video_watch' ? '🎥' :
-                 activity.task_type === 'quiz' ? '❓' :
-                 activity.task_type === 'custom_quiz' ? '🧩' :
-                 activity.task_type === 'referral' ? '👥' :
-                 activity.task_type === 'spin' ? '🎡' : '🎯'
+        activity.task_type === 'video_watch' ? '🎥' :
+          activity.task_type === 'quiz' ? '❓' :
+            activity.task_type === 'custom_quiz' ? '🧩' :
+              activity.task_type === 'referral' ? '👥' :
+                activity.task_type === 'spin' ? '🎡' : '🎯'
     }));
 
     // Get the next cursor
@@ -1772,7 +1769,7 @@ router.patch('/settings/:key', adminAuth, async (req, res) => {
   try {
     const { key } = req.params;
     const { value } = req.body;
-    
+
     if (value === null || value === undefined) {
       return res.status(400).json({ message: 'Value is required' });
     }
@@ -1800,7 +1797,7 @@ router.patch('/settings/:key', adminAuth, async (req, res) => {
 router.post('/settings/bulk-update', adminAuth, async (req, res) => {
   try {
     const { settings } = req.body;
-    
+
     if (!Array.isArray(settings)) {
       return res.status(400).json({ message: 'Settings must be an array' });
     }
@@ -1811,10 +1808,10 @@ router.post('/settings/bulk-update', adminAuth, async (req, res) => {
       if (value === null || value === undefined) {
         throw new Error(`Invalid value for ${key}: value is required`);
       }
-      
+
       // Convert value to string to support text column type
       const stringValue = String(value);
-      
+
       const result = await pool.query(
         `INSERT INTO settings (key, value, description, updated_at)
          VALUES ($1, $2, NULL, NOW())
@@ -1935,17 +1932,17 @@ router.delete('/spin-wheel/rewards/:id', adminAuth, async (req, res) => {
 // Reset spin wheel rewards to default (handles foreign key constraints)
 router.post('/spin-wheel/reset-to-default', adminAuth, async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     // First, update any existing spins to reference a temporary placeholder or set to NULL
     // We'll set reward_id to NULL for existing spins to break the foreign key constraint
     await client.query('UPDATE spins SET reward_id = NULL WHERE reward_id IS NOT NULL');
-    
+
     // Now we can safely delete all existing rewards
     await client.query('DELETE FROM spin_wheel_rewards');
-    
+
     // Insert default rewards
     const defaultRewards = [
       { label: '5 Points', points: 5, color: '#18181b', probability: 0.25, position: 0 },
@@ -1957,7 +1954,7 @@ router.post('/spin-wheel/reset-to-default', adminAuth, async (req, res) => {
       { label: '500 Points', points: 500, color: '#facc15', probability: 0.05, position: 6 },
       { label: 'Free Spin', points: 0, color: '#18181b', probability: 0.05, position: 7 },
     ];
-    
+
     const insertedRewards = [];
     for (const reward of defaultRewards) {
       const result = await client.query(
@@ -1967,13 +1964,13 @@ router.post('/spin-wheel/reset-to-default', adminAuth, async (req, res) => {
       );
       insertedRewards.push(result.rows[0]);
     }
-    
+
     await client.query('COMMIT');
-    res.json({ 
+    res.json({
       message: 'Successfully reset to default rewards',
-      rewards: insertedRewards 
+      rewards: insertedRewards
     });
-    
+
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error resetting to default rewards:', error);
@@ -2027,7 +2024,7 @@ router.get('/api/spin-wheel/rewards', async (req, res) => {
 router.post('/api/spin-wheel/spin', async (req, res) => {
   try {
     const { user_id } = req.body;
-    
+
     if (!user_id) {
       return res.status(400).json({ message: 'User ID is required' });
     }
@@ -2060,7 +2057,7 @@ router.post('/api/spin-wheel/spin', async (req, res) => {
     // Select reward based on probability
     let currentSum = 0;
     let selectedReward = rewardsResult.rows[0]; // Default to first reward
-    
+
     for (const reward of rewardsResult.rows) {
       currentSum += (reward.probability || 1);
       if (random <= currentSum) {
@@ -2137,17 +2134,17 @@ router.get('/api/spin-wheel/history/:user_id', async (req, res) => {
 router.get('/quizzes', adminAuth, async (req, res) => {
   try {
     const { category } = req.query;
-    
+
     let categoryFilter = '';
     let queryParams = [];
-    
+
     if (category && category !== 'Uncategorized') {
       categoryFilter = 'WHERE q.category = $1';
       queryParams.push(category);
     } else if (category === 'Uncategorized') {
       categoryFilter = 'WHERE (q.category IS NULL OR q.category = \'\')';
     }
-    
+
     const result = await pool.query(`
       SELECT 
         q.id,
@@ -2188,13 +2185,13 @@ router.get('/quizzes/categories', adminAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT DISTINCT category FROM quizzes WHERE category IS NOT NULL AND category != \'\' ORDER BY category ASC');
     const categories = result.rows.map(row => row.category || 'Uncategorized');
-    
+
     // Add 'Uncategorized' if there are quizzes without categories
     const uncategorizedResult = await pool.query('SELECT COUNT(*) FROM quizzes WHERE category IS NULL OR category = \'\'');
     if (parseInt(uncategorizedResult.rows[0].count) > 0) {
       categories.unshift('Uncategorized');
     }
-    
+
     res.json({ categories });
   } catch (error) {
     console.error('Error fetching quiz categories:', error);
@@ -2255,51 +2252,51 @@ router.post('/quizzes',
     question_count: req.body.questions?.length || 0
   })),
   async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const { title, hashtags, points_per_question, questions, category } = req.body;
+    const client = await pool.connect();
+    try {
+      const { title, hashtags, points_per_question, questions, category } = req.body;
 
-    if (!title || !questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ message: 'Title and at least one question are required' });
-    }
-
-    await client.query('BEGIN');
-
-    // Create quiz
-    const quizResult = await client.query(
-      'INSERT INTO quizzes (title, hashtags, points_per_question, category) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, hashtags || [], points_per_question || 10, category || null]
-    );
-
-    const quiz = quizResult.rows[0];
-
-    // Add questions
-    const questionPromises = questions.map(q => 
-      client.query(
-        'INSERT INTO quiz_questions (quiz_id, question_text, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
-        [quiz.id, q.question_text, q.correct_answer, q.wrong_answers]
-      )
-    );
-
-    const questionResults = await Promise.all(questionPromises);
-    const savedQuestions = questionResults.map(r => r.rows[0]);
-
-    await client.query('COMMIT');
-
-    res.status(201).json({
-      quiz: {
-        ...quiz,
-        questions: savedQuestions
+      if (!title || !questions || !Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ message: 'Title and at least one question are required' });
       }
-    });
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error creating quiz:', error);
-    res.status(500).json({ message: 'Server error' });
-  } finally {
-    client.release();
-  }
-});
+
+      await client.query('BEGIN');
+
+      // Create quiz
+      const quizResult = await client.query(
+        'INSERT INTO quizzes (title, hashtags, points_per_question, category) VALUES ($1, $2, $3, $4) RETURNING *',
+        [title, hashtags || [], points_per_question || 10, category || null]
+      );
+
+      const quiz = quizResult.rows[0];
+
+      // Add questions
+      const questionPromises = questions.map(q =>
+        client.query(
+          'INSERT INTO quiz_questions (quiz_id, question_text, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
+          [quiz.id, q.question_text, q.correct_answer, q.wrong_answers]
+        )
+      );
+
+      const questionResults = await Promise.all(questionPromises);
+      const savedQuestions = questionResults.map(r => r.rows[0]);
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        quiz: {
+          ...quiz,
+          questions: savedQuestions
+        }
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error creating quiz:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      client.release();
+    }
+  });
 
 // Update quiz
 router.put('/quizzes/:id',
@@ -2310,14 +2307,14 @@ router.put('/quizzes/:id',
     is_active: req.body.is_active
   })),
   async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const { id } = req.params;
-    const { title, hashtags, points_per_question, is_active, questions, require_finish_task_id, require_finish_task_type, category } = req.body;
-    await client.query('BEGIN');
-    // Update quiz
-    const quizResult = await client.query(
-      `UPDATE quizzes 
+    const client = await pool.connect();
+    try {
+      const { id } = req.params;
+      const { title, hashtags, points_per_question, is_active, questions, require_finish_task_id, require_finish_task_type, category } = req.body;
+      await client.query('BEGIN');
+      // Update quiz
+      const quizResult = await client.query(
+        `UPDATE quizzes 
        SET title = COALESCE($1, title),
            hashtags = COALESCE($2, hashtags),
            points_per_question = COALESCE($3, points_per_question),
@@ -2328,74 +2325,74 @@ router.put('/quizzes/:id',
            category = COALESCE($7, category)
        WHERE id = $8
        RETURNING *`,
-      [title, hashtags, points_per_question, is_active, require_finish_task_id, require_finish_task_type, category, id]
-    );
-
-    if (quizResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Quiz not found' });
-    }
-
-    // If questions provided, update them
-    if (questions && Array.isArray(questions)) {
-      // Delete existing questions
-      await client.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
-
-      // Add new questions
-      const questionPromises = questions.map(q =>
-        client.query(
-          'INSERT INTO quiz_questions (quiz_id, question_text, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
-          [id, q.question_text, q.correct_answer, q.wrong_answers]
-        )
+        [title, hashtags, points_per_question, is_active, require_finish_task_id, require_finish_task_type, category, id]
       );
 
-      const questionResults = await Promise.all(questionPromises);
-      const savedQuestions = questionResults.map(r => r.rows[0]);
+      if (quizResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: 'Quiz not found' });
+      }
 
-      await client.query('COMMIT');
+      // If questions provided, update them
+      if (questions && Array.isArray(questions)) {
+        // Delete existing questions
+        await client.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [id]);
 
-      res.json({
-        quiz: {
-          ...quizResult.rows[0],
-          questions: savedQuestions
-        }
-      });
-    } else {
-      await client.query('COMMIT');
-      res.json({ quiz: quizResult.rows[0] });
+        // Add new questions
+        const questionPromises = questions.map(q =>
+          client.query(
+            'INSERT INTO quiz_questions (quiz_id, question_text, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4) RETURNING *',
+            [id, q.question_text, q.correct_answer, q.wrong_answers]
+          )
+        );
+
+        const questionResults = await Promise.all(questionPromises);
+        const savedQuestions = questionResults.map(r => r.rows[0]);
+
+        await client.query('COMMIT');
+
+        res.json({
+          quiz: {
+            ...quizResult.rows[0],
+            questions: savedQuestions
+          }
+        });
+      } else {
+        await client.query('COMMIT');
+        res.json({ quiz: quizResult.rows[0] });
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error updating quiz:', error);
+      res.status(500).json({ message: 'Server error' });
+    } finally {
+      client.release();
     }
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error updating quiz:', error);
-    res.status(500).json({ message: 'Server error' });
-  } finally {
-    client.release();
-  }
-});
+  });
 
 // Delete quiz
 router.delete('/quizzes/:id',
   adminAuth,
   activityLogger('delete', 'quiz', 'id'),
   async (req, res) => {
-  try {
-    const { id } = req.params;
+    try {
+      const { id } = req.params;
 
-    const result = await pool.query(
-      'DELETE FROM quizzes WHERE id = $1 RETURNING *',
-      [id]
-    );
+      const result = await pool.query(
+        'DELETE FROM quizzes WHERE id = $1 RETURNING *',
+        [id]
+      );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Quiz not found' });
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'Quiz not found' });
+      }
+
+      res.json({ message: 'Quiz deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting quiz:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    res.json({ message: 'Quiz deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting quiz:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+  });
 
 
 
@@ -2499,23 +2496,23 @@ router.get('/user-promotions', adminAuth, async (req, res) => {
   try {
     const { status, type, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
-    
+
     let whereClause = 'WHERE 1=1';
     let queryParams = [];
     let paramCount = 0;
-    
+
     if (status) {
       paramCount++;
       whereClause += ` AND usp.status = $${paramCount}`;
       queryParams.push(status);
     }
-    
+
     if (type) {
       paramCount++;
       whereClause += ` AND usp.type = $${paramCount}`;
       queryParams.push(type);
     }
-    
+
     // Get promotions with user info
     const result = await pool.query(`
       SELECT 
@@ -2533,15 +2530,15 @@ router.get('/user-promotions', adminAuth, async (req, res) => {
       ORDER BY usp.created_at DESC
       LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
     `, [...queryParams, limit, offset]);
-    
+
     // Get total count
     const countResult = await pool.query(`
       SELECT COUNT(*) FROM user_submitted_promotions usp ${whereClause}
     `, queryParams);
-    
+
     const total = parseInt(countResult.rows[0].count);
     const pages = Math.ceil(total / limit);
-    
+
     res.json({
       promotions: result.rows,
       pagination: {
@@ -2560,7 +2557,7 @@ router.get('/user-promotions', adminAuth, async (req, res) => {
 router.get('/user-promotions/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const result = await pool.query(`
       SELECT 
         usp.*,
@@ -2572,13 +2569,13 @@ router.get('/user-promotions/:id', adminAuth, async (req, res) => {
       LEFT JOIN telegram_users tu ON usp.user_id = tu.id
       WHERE usp.id = $1
     `, [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Promotion not found' });
     }
-    
+
     const promotion = result.rows[0];
-    
+
     // Get engagements for this promotion
     const engagementsResult = await pool.query(`
       SELECT 
@@ -2592,15 +2589,15 @@ router.get('/user-promotions/:id', adminAuth, async (req, res) => {
       WHERE upe.promotion_id = $1
       ORDER BY upe.created_at DESC
     `, [id]);
-    
+
     // Get linked tasks based on promotion type
     let linkedTask = null;
-    
+
     if (promotion.type === 'channel_join' && promotion.status !== 'pending') {
       const channelResult = await pool.query(`
         SELECT * FROM telegram_channels WHERE promotion_id = $1
       `, [id]);
-      
+
       if (channelResult.rows.length > 0) {
         linkedTask = {
           type: 'channel',
@@ -2611,15 +2608,15 @@ router.get('/user-promotions/:id', adminAuth, async (req, res) => {
       const videoResult = await pool.query(`
         SELECT * FROM youtube_tasks WHERE promotion_id = $1
       `, [id]);
-      
+
       if (videoResult.rows.length > 0) {
         const videoTask = videoResult.rows[0];
-        
+
         // Get questions for this video task
         const questionsResult = await pool.query(`
           SELECT * FROM youtube_questions WHERE youtube_task_id = $1
         `, [videoTask.id]);
-        
+
         linkedTask = {
           type: 'video',
           data: {
@@ -2629,7 +2626,7 @@ router.get('/user-promotions/:id', adminAuth, async (req, res) => {
         };
       }
     }
-    
+
     res.json({
       promotion: promotion,
       engagements: engagementsResult.rows,
@@ -2645,25 +2642,25 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { admin_notes, validation_questions } = req.body;
-    
+
     // Use a transaction to ensure all operations succeed or fail together
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Get promotion settings based on type
       const promotionInfo = await client.query(`
         SELECT * FROM user_submitted_promotions WHERE id = $1 AND status = 'pending'
       `, [id]);
-      
+
       if (promotionInfo.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ message: 'Promotion not found or already processed' });
       }
-      
+
       const promotionData = promotionInfo.rows[0];
-      
+
       // Make sure we have the reward and cost settings
       if (!promotionData.reward_per_action || !promotionData.cost_per_action) {
         // If missing, get from settings and update
@@ -2675,11 +2672,11 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
           promotionData.type === 'channel_join' ? 'channel_join_reward_points' : 'video_boost_reward_points',
           promotionData.type === 'channel_join' ? 'channel_join_admin_profit' : 'video_boost_admin_profit'
         ]);
-        
+
         const rewardPerAction = parseInt(settingsResult.rows[0].reward_per_action);
         const adminProfitPerAction = parseInt(settingsResult.rows[0].admin_profit_per_action);
         const costPerAction = rewardPerAction + adminProfitPerAction;
-        
+
         // Update the promotion with these values
         await client.query(`
           UPDATE user_submitted_promotions
@@ -2688,14 +2685,14 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
               cost_per_action = $3
           WHERE id = $4
         `, [rewardPerAction, adminProfitPerAction, costPerAction, id]);
-        
+
         // Reload the promotion data with updated values
         const updatedPromotionInfo = await client.query(`
           SELECT * FROM user_submitted_promotions WHERE id = $1
         `, [id]);
         promotionData = updatedPromotionInfo.rows[0];
       }
-      
+
       // Now approve the promotion
       const result = await client.query(`
         UPDATE user_submitted_promotions 
@@ -2703,20 +2700,20 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
         WHERE id = $3 AND status = 'pending'
         RETURNING *
       `, [admin_notes || null, validation_questions ? JSON.stringify(validation_questions) : null, id]);
-      
+
       if (result.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ message: 'Promotion not found or already processed' });
       }
-      
+
       const promotion = result.rows[0] || promotionData;
-      
+
       // Create corresponding task based on promotion type
       if (promotion.type === 'channel_join') {
         // Extract channel name from target_url
         let channelIdentifier = '';
         const link = promotion.target_url.trim();
-        
+
         if (link.includes('t.me/')) {
           // Handle t.me links
           const path = link.split('t.me/')[1].split('?')[0].split('/')[0];
@@ -2745,22 +2742,22 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
           // Assume it's a direct username or channel ID
           channelIdentifier = link;
         }
-        
+
         // Remove any trailing slashes or parameters
         channelIdentifier = channelIdentifier.replace(/\/+$/, '');
-        
+
         // Get channel info to determine if it's public or private
         const bot = await createBot();
         if (!bot.isReady) {
           await bot.start();
         }
-        
+
         const channelInfo = await bot.getChannelInfo(channelIdentifier);
-        
+
         // Determine channel properties
         let channelName, standardLink, displayName;
         let isPublic = false;
-        
+
         if (channelInfo.username) {
           // Public channel with username
           channelName = channelInfo.username;
@@ -2779,7 +2776,7 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
             standardLink = link; // Keep the original link for other private channels
           }
         }
-        
+
         // Insert into telegram_channels
         const channelResult = await client.query(`
           INSERT INTO telegram_channels 
@@ -2804,7 +2801,7 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
         const tiktokMatch = promotion.target_url.match(/(?:tiktok\.com\/.*\/video\/|vm\.tiktok\.com\/|t\.tiktok\.com\/)([\w]+)/);
         const videoId = youtubeMatch || tiktokMatch;
         let youtubeUrl = promotion.target_url;
-        
+
         if (videoId) {
           // Ensure URL is in standard format for YouTube videos only
           if (youtubeMatch) {
@@ -2817,10 +2814,10 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
               throw new Error('Video info not available for TikTok videos');
             }
             const videoInfo = await getYouTubeVideoInfo(youtubeMatch[1]);
-            
+
             // Convert ISO duration to seconds
             const videoDurationSecs = getVideoDurationInSeconds(videoInfo.duration_seconds);
-            
+
             // Insert into youtube_tasks with complete video info
             const videoResult = await client.query(`
               INSERT INTO youtube_tasks 
@@ -2843,9 +2840,9 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
             if (promotion.validation_questions && Array.isArray(promotion.validation_questions) && promotion.validation_questions.length > 0) {
               for (const q of promotion.validation_questions) {
                 if (q.question && q.correct_answer) {
-                  const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers : 
-                                           (q.wrong_answers ? [q.wrong_answers] : []);
-                  
+                  const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers :
+                    (q.wrong_answers ? [q.wrong_answers] : []);
+
                   await client.query(
                     'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4)',
                     [youtubeTask.id, q.question, q.correct_answer, wrongAnswersArray]
@@ -2877,9 +2874,9 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
             if (promotion.validation_questions && Array.isArray(promotion.validation_questions) && promotion.validation_questions.length > 0) {
               for (const q of promotion.validation_questions) {
                 if (q.question && q.correct_answer) {
-                  const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers : 
-                                           (q.wrong_answers ? [q.wrong_answers] : []);
-                  
+                  const wrongAnswersArray = Array.isArray(q.wrong_answers) ? q.wrong_answers :
+                    (q.wrong_answers ? [q.wrong_answers] : []);
+
                   await client.query(
                     'INSERT INTO youtube_questions (youtube_task_id, question, correct_answer, wrong_answers) VALUES ($1, $2, $3, $4)',
                     [youtubeTask.id, q.question, q.correct_answer, wrongAnswersArray]
@@ -2890,9 +2887,9 @@ router.put('/user-promotions/:id/approve', adminAuth, async (req, res) => {
           }
         }
       }
-      
+
       await client.query('COMMIT');
-      
+
       // Send notification to user
       const notificationMessage = `
 ✅ <b>Promotion Approved!</b>
@@ -2910,9 +2907,9 @@ Your promotion is now ready to be activated. You can activate it from your promo
 
 Thank you for using our platform!
       `.trim();
-      
+
       await sendBotNotification(promotion.user_id, notificationMessage);
-      
+
       res.json({ message: 'Promotion approved successfully', promotion: promotion });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -2930,26 +2927,26 @@ router.put('/user-promotions/:id/decline', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { admin_notes } = req.body;
-    
+
     // Use transaction to ensure consistent updates
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Get the promotion and check status
       const promotionResult = await client.query(`
         SELECT * FROM user_submitted_promotions 
         WHERE id = $1 AND status = 'pending'
       `, [id]);
-      
+
       if (promotionResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ message: 'Promotion not found or already processed' });
       }
-      
+
       const promotion = promotionResult.rows[0];
-      
+
       // Update promotion status
       const result = await client.query(`
         UPDATE user_submitted_promotions 
@@ -2957,12 +2954,12 @@ router.put('/user-promotions/:id/decline', adminAuth, async (req, res) => {
         WHERE id = $2
         RETURNING *
       `, [admin_notes || null, id]);
-      
+
       // Refund points if this was a points-based promotion
       if (promotion.budget_points) {
         // Call the refund function
         await client.query(`SELECT refund_promotion_points($1)`, [id]);
-        
+
         // Send notification to user
         const notificationMessage = `
 ❌ <b>Promotion Declined</b>
@@ -2974,10 +2971,10 @@ Your ${promotion.budget_points} points have been refunded to your account.
 
 Thank you for using our platform!
         `.trim();
-        
+
         await sendBotNotification(promotion.user_id, notificationMessage);
       }
-      
+
       await client.query('COMMIT');
       res.json({ message: 'Promotion declined successfully', promotion: result.rows[0] });
     } catch (error) {
@@ -2995,13 +2992,13 @@ Thank you for using our platform!
 router.put('/user-promotions/:id/activate', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Use transaction for consistent updates
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Get promotion details
       const promotionResult = await client.query(`
         SELECT usp.*, tu.points
@@ -3009,26 +3006,26 @@ router.put('/user-promotions/:id/activate', adminAuth, async (req, res) => {
         JOIN telegram_users tu ON tu.id = usp.user_id
         WHERE usp.id = $1 AND usp.status = 'approved'
       `, [id]);
-      
+
       if (promotionResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ message: 'Promotion not found or not approved' });
       }
-      
+
       const promotion = promotionResult.rows[0];
-      
+
       // For points-based promotions, check user has enough points
       if (promotion.budget_points) {
         if (promotion.points < promotion.budget_points) {
           await client.query('ROLLBACK');
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: 'User does not have enough points to activate this promotion'
           });
         }
-        
+
         // Calculate total required points based on target and cost
         const totalRequiredPoints = promotion.target_views_joins * promotion.cost_per_action;
-        
+
         // Set the points aside in user's locked_points
         await client.query(`
           UPDATE telegram_users
@@ -3036,7 +3033,7 @@ router.put('/user-promotions/:id/activate', adminAuth, async (req, res) => {
               locked_points = COALESCE(locked_points, 0) + $1
           WHERE id = $2
         `, [totalRequiredPoints, promotion.user_id]);
-        
+
         // Update promotion stats to track held balance
         await client.query(`
           UPDATE user_submitted_promotions
@@ -3048,7 +3045,7 @@ router.put('/user-promotions/:id/activate', adminAuth, async (req, res) => {
           WHERE id = $2
         `, [totalRequiredPoints.toString(), id]);
       }
-      
+
       // Update promotion status
       const result = await client.query(`
         UPDATE user_submitted_promotions 
@@ -3056,7 +3053,7 @@ router.put('/user-promotions/:id/activate', adminAuth, async (req, res) => {
         WHERE id = $1
         RETURNING *
       `, [id]);
-      
+
       // Send notification to user
       const notificationMessage = `
 🚀 <b>Promotion Activated!</b>
@@ -3073,9 +3070,9 @@ You can track your promotion's performance in your dashboard.
 
 Thank you for using our platform!
       `.trim();
-      
+
       await sendBotNotification(promotion.user_id, notificationMessage);
-      
+
       await client.query('COMMIT');
       res.json({ message: 'Promotion activated successfully', promotion: result.rows[0] });
     } catch (error) {
@@ -3094,13 +3091,13 @@ router.put('/user-promotions/:id/deactivate', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { refund_remaining } = req.body;
-    
+
     // Use transaction to ensure consistent updates
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Get the promotion and check status
       const promotionResult = await client.query(`
         SELECT usp.*, tu.locked_points,
@@ -3109,14 +3106,14 @@ router.put('/user-promotions/:id/deactivate', adminAuth, async (req, res) => {
         JOIN telegram_users tu ON tu.id = usp.user_id
         WHERE usp.id = $1 AND usp.status = 'active'
       `, [id]);
-      
+
       if (promotionResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ message: 'Promotion not found or not active' });
       }
-      
+
       const promotion = promotionResult.rows[0];
-      
+
       // Update promotion status
       const result = await client.query(`
         UPDATE user_submitted_promotions 
@@ -3124,7 +3121,7 @@ router.put('/user-promotions/:id/deactivate', adminAuth, async (req, res) => {
         WHERE id = $1
         RETURNING *
       `, [id]);
-      
+
       // Refund remaining points if requested and this was a points-based promotion
       if (refund_remaining && promotion.budget_points && promotion.held_balance > 0) {
         // Return locked points to user
@@ -3134,7 +3131,7 @@ router.put('/user-promotions/:id/deactivate', adminAuth, async (req, res) => {
               locked_points = GREATEST(0, locked_points - $1)
           WHERE id = $2
         `, [promotion.held_balance, promotion.user_id]);
-        
+
         // Reset held balance
         await client.query(`
           UPDATE user_submitted_promotions
@@ -3145,7 +3142,7 @@ router.put('/user-promotions/:id/deactivate', adminAuth, async (req, res) => {
           )
           WHERE id = $1
         `, [id]);
-        
+
         // Send notification to user
         const notificationMessage = `
 ✅ <b>Promotion Completed</b>
@@ -3156,10 +3153,10 @@ ${promotion.held_balance} points have been refunded to your account.
 
 Thank you for using our platform!
         `.trim();
-        
+
         await sendBotNotification(promotion.user_id, notificationMessage);
       }
-      
+
       await client.query('COMMIT');
       res.json({ message: 'Promotion deactivated successfully', promotion: result.rows[0] });
     } catch (error) {

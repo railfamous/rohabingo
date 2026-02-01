@@ -16,25 +16,25 @@ class TelegramBot {
     };
 
     this.humanSendText = async (chatId, text, opts) => {
-      try { await this.bot.sendChatAction(chatId, 'typing'); } catch {}
+      try { await this.bot.sendChatAction(chatId, 'typing'); } catch { }
       await this.sleep(this.calcHumanDelay(text));
       return this.bot.sendMessage(chatId, text, opts);
     };
 
     this.humanSendPhoto = async (chatId, fileIdOrUrl, opts) => {
-      try { await this.bot.sendChatAction(chatId, 'upload_photo'); } catch {}
+      try { await this.bot.sendChatAction(chatId, 'upload_photo'); } catch { }
       await this.sleep(850);
       return this.bot.sendPhoto(chatId, fileIdOrUrl, opts);
     };
 
     this.humanSendVideo = async (chatId, fileIdOrUrl, opts) => {
-      try { await this.bot.sendChatAction(chatId, 'upload_video'); } catch {}
+      try { await this.bot.sendChatAction(chatId, 'upload_video'); } catch { }
       await this.sleep(950);
       return this.bot.sendVideo(chatId, fileIdOrUrl, opts);
     };
 
     this.humanSendDocument = async (chatId, fileIdOrUrl, opts) => {
-      try { await this.bot.sendChatAction(chatId, 'upload_document'); } catch {}
+      try { await this.bot.sendChatAction(chatId, 'upload_document'); } catch { }
       await this.sleep(900);
       return this.bot.sendDocument(chatId, fileIdOrUrl, opts);
     };
@@ -151,7 +151,7 @@ class TelegramBot {
                updated_at=NOW()`,
             [chatId, chatType, msg.chat.title || null, msg.chat.username || null]
           );
-        } catch {}
+        } catch { }
 
         // Resolve moderation settings for this chat:
         // 1) global defaults from settings table
@@ -190,13 +190,13 @@ class TelegramBot {
 
           settings = row
             ? {
-                enabled: row.enabled !== false,
-                welcome_enabled: !!row.welcome_enabled,
-                welcome_text: row.welcome_text || '',
-                delete_links_enabled: !!row.delete_links_enabled,
-                auto_mute_enabled: !!row.auto_mute_enabled,
-                auto_mute_seconds: Number(row.auto_mute_seconds || 3600),
-              }
+              enabled: row.enabled !== false,
+              welcome_enabled: !!row.welcome_enabled,
+              welcome_text: row.welcome_text || '',
+              delete_links_enabled: !!row.delete_links_enabled,
+              auto_mute_enabled: !!row.auto_mute_enabled,
+              auto_mute_seconds: Number(row.auto_mute_seconds || 3600),
+            }
             : globalSettings;
         } catch {
           return;
@@ -258,7 +258,7 @@ class TelegramBot {
           if (containsLink && msg.message_id && msg.from) {
             try {
               await this.bot.deleteMessage(chatId, msg.message_id);
-            } catch {}
+            } catch { }
 
             if (settings.auto_mute_enabled) {
               // Telegram may ignore/round very small until_date values.
@@ -280,11 +280,11 @@ class TelegramBot {
                   },
                   until_date: untilDate
                 });
-              } catch {}
+              } catch { }
             }
           }
         }
-      } catch {}
+      } catch { }
     });
 
     // Scheduler: send due scheduled posts
@@ -312,18 +312,18 @@ class TelegramBot {
             await pool.query('UPDATE scheduled_posts SET status=\'failed\', error=$2, updated_at=NOW() WHERE id=$1', [job.id, String(e?.message || e)]);
           }
         }
-      } catch {}
+      } catch { }
     }, 5000);
   }
 
   // Setup scheduled verification of channel memberships
   async setupChannelVerificationScheduler() {
     const pool = require('./config/database');
-    
+
     // First ensure the required column exists
     try {
       logger.info('Checking if next_channel_verification column exists in telegram_users table...');
-      
+
       // Check if the column exists
       const columnCheckResult = await pool.query(`
         SELECT column_name 
@@ -331,10 +331,10 @@ class TelegramBot {
         WHERE table_name = 'telegram_users' 
         AND column_name = 'next_channel_verification'
       `);
-      
+
       if (columnCheckResult.rowCount === 0) {
         logger.info('next_channel_verification column does not exist, adding it now...');
-        
+
         // Add the missing column
         await pool.query(`
           ALTER TABLE telegram_users
@@ -345,7 +345,7 @@ class TelegramBot {
           SET next_channel_verification = NOW() + INTERVAL '24 hours'
           WHERE next_channel_verification IS NULL;
         `);
-        
+
         logger.info('Added next_channel_verification column to telegram_users table');
       } else {
         logger.info('next_channel_verification column exists, continuing...');
@@ -354,7 +354,7 @@ class TelegramBot {
       logger.error('Error checking/adding column next_channel_verification:', error);
       // Continue anyway, we'll try to run the verification
     }
-    
+
     // Function to determine when to run next verification
     const scheduleNextVerification = async () => {
       try {
@@ -363,7 +363,7 @@ class TelegramBot {
           "SELECT value FROM settings WHERE key = 'channel_verification_frequency_hours'"
         );
         const verificationFrequencyHours = parseInt(settingsResult.rows[0]?.value) || 24;
-        
+
         // Convert to milliseconds
         return verificationFrequencyHours * 60 * 60 * 1000;
       } catch (error) {
@@ -371,18 +371,18 @@ class TelegramBot {
         return 24 * 60 * 60 * 1000; // Default to 24 hours
       }
     };
-    
+
     // Function to run verification
     const runVerification = async () => {
       try {
         logger.info('Starting scheduled channel membership verification...');
         const stats = await this.verifyAllChannelMemberships();
         logger.info(`Scheduled verification completed: ${stats.verified} verified, ${stats.left} left, ${stats.errors} errors`);
-        
+
         // Schedule next verification
         const nextInterval = await scheduleNextVerification();
         setTimeout(runVerification, nextInterval);
-        
+
         logger.info(`Next channel verification scheduled in ${nextInterval / (1000 * 60 * 60)} hours`);
       } catch (error) {
         logger.error('Error in scheduled channel verification:', error);
@@ -390,7 +390,7 @@ class TelegramBot {
         setTimeout(runVerification, 60 * 60 * 1000);
       }
     };
-    
+
     // Start the scheduler with initial delay of 1 minute
     setTimeout(async () => {
       const interval = await scheduleNextVerification();
@@ -403,23 +403,23 @@ class TelegramBot {
     try {
       // Try to get the channel entity
       const entity = await this.bot.getChat(channelIdentifier);
-      
+
       if (!entity) {
         throw new Error('Channel not found or bot does not have access');
       }
-      
+
       // Check if the bot has admin rights
       try {
         const fullChannel = await this.bot.getChatAdministrators(channelIdentifier);
-        
+
         if (!fullChannel || !fullChannel.find(admin => admin.user.id === this.bot.options.credentials.id)) {
           throw new Error('Bot is not a member of the channel');
         }
-        
+
         // Check if the bot is an admin
         const isAdmin = fullChannel.find(admin => admin.user.id === this.bot.options.credentials.id).status === 'creator' ||
-                       fullChannel.find(admin => admin.user.id === this.bot.options.credentials.id).status === 'administrator';
-        
+          fullChannel.find(admin => admin.user.id === this.bot.options.credentials.id).status === 'administrator';
+
         return {
           id: entity.id.toString(),
           title: entity.title,
@@ -437,7 +437,7 @@ class TelegramBot {
       throw error;
     }
   }
-  
+
   /**
    * Check if a user is still a member of a specific Telegram channel
    * @param {number|string} userId - Telegram user ID
@@ -468,7 +468,7 @@ class TelegramBot {
       return true;
     }
   }
-  
+
   /**
    * Verify all users' channel memberships that need verification based on configured frequency
    * @returns {Promise<{verified: number, left: number, errors: number}>} - Verification stats
@@ -476,18 +476,18 @@ class TelegramBot {
   async verifyAllChannelMemberships() {
     const pool = require('./config/database');
     const stats = { verified: 0, left: 0, errors: 0 };
-    
+
     try {
       if (!this.isClientReady()) {
         await this.ensureConnection();
       }
-      
+
       // Get verification frequency from settings
       const settingsResult = await pool.query(
         "SELECT value FROM settings WHERE key = 'channel_verification_frequency_hours'"
       );
       const verificationFrequencyHours = parseInt(settingsResult.rows[0]?.value) || 24;
-      
+
       // Find users who need verification (their next_channel_verification is in the past or null)
       const usersResult = await pool.query(`
         SELECT DISTINCT u.id, u.username, u.first_name
@@ -498,7 +498,7 @@ class TelegramBot {
           AND (u.next_channel_verification IS NULL OR u.next_channel_verification < NOW())
         LIMIT 100 -- Process in batches to avoid overload
       `);
-      
+
       for (const user of usersResult.rows) {
         try {
           // Get all completed channel tasks for this user
@@ -510,22 +510,22 @@ class TelegramBot {
               AND tp.task_type = 'channel_join'
               AND tp.status = 'completed'
           `, [user.id]);
-          
+
           let userLeftAnyChannel = false;
-          
+
           // Check membership for each channel
           for (const channel of channelsResult.rows) {
             try {
               const channelName = channel.name;
               const isMember = await this.checkUserChannelMembership(user.id, channelName);
-              
+
               // Record verification in log table
               await pool.query(`
                 INSERT INTO channel_membership_verifications 
                 (user_id, channel_id, verification_time, is_member)
                 VALUES ($1, $2, NOW(), $3)
               `, [user.id, channel.task_id, isMember]);
-              
+
               if (!isMember) {
                 // Update task_progress to indicate user has left
                 await pool.query(`
@@ -534,7 +534,7 @@ class TelegramBot {
                       last_verified_at = NOW() 
                   WHERE user_id = $1 AND task_id = $2 AND task_type = 'channel_join'
                 `, [user.id, channel.task_id]);
-                
+
                 userLeftAnyChannel = true;
                 stats.left++;
               } else {
@@ -546,18 +546,18 @@ class TelegramBot {
                   WHERE user_id = $1 AND task_id = $2 AND task_type = 'channel_join'
                 `, [user.id, channel.task_id]);
               }
-              
+
               stats.verified++;
             } catch (error) {
               logger.error(`Error verifying channel membership for user ${user.id}, channel ${channel.task_id}:`, error);
               stats.errors++;
             }
           }
-          
+
           // Update user's verification status
           const nextVerification = new Date();
           nextVerification.setHours(nextVerification.getHours() + verificationFrequencyHours);
-          
+
           await pool.query(`
             UPDATE telegram_users 
             SET last_channel_verification = NOW(),
@@ -567,7 +567,7 @@ class TelegramBot {
                 tasks_suspended_reason = CASE WHEN $2 = TRUE THEN 'You have left Telegram channels you were paid to join. Please rejoin to continue earning.' ELSE NULL END
             WHERE id = $3
           `, [nextVerification, userLeftAnyChannel, user.id]);
-          
+
           // If user left a channel, try to send them a notification
           if (userLeftAnyChannel) {
             try {
@@ -578,181 +578,35 @@ class TelegramBot {
               logger.error(`Failed to send notification message to user ${user.id}:`, msgError);
             }
           }
-          
+
         } catch (userError) {
           logger.error(`Error processing verification for user ${user.id}:`, userError);
           stats.errors++;
         }
       }
-      
+
       logger.info(`Channel membership verification completed: ${stats.verified} verifications, ${stats.left} users left channels, ${stats.errors} errors`);
       return stats;
     } catch (error) {
       logger.error('Error in verifyAllChannelMemberships:', error);
       throw error;
     }
-  }  async processReferral(userId, referralCode, newUserInfo = {}) {
-    try {
-      const pool = require('./config/database');
-      
-      // Ensure userId is a proper number (not a string)
-      const userIdNum = parseInt(userId, 10);
-      
-      if (isNaN(userIdNum)) {
-        logger.error('Invalid user ID:', userId);
-        return { success: false, message: 'Invalid user ID' };
-      }
-
-      // Check if referral code exists
-      const referrerResult = await pool.query(
-        'SELECT id, username, first_name, last_name FROM telegram_users WHERE referral_code = $1',
-        [referralCode]
-      );
-
-      if (referrerResult.rows.length === 0) {
-        return { success: false, message: 'Invalid referral code' };
-      }
-
-      const referrer = referrerResult.rows[0];
-      const referrerId = parseInt(referrer.id, 10);
-      
-      // Don't allow self-referrals
-      if (referrerId === userIdNum) {
-        return { success: false, message: 'Cannot use your own referral code' };
-      }
-      
-      // Check if this user has already been referred
-      const existingReferralResult = await pool.query(
-        'SELECT id FROM referrals WHERE referred_id = $1',
-        [userIdNum]
-      );
-      
-      if (existingReferralResult.rows.length > 0) {
-        return { success: false, message: 'User already has a referrer' };
-      }
-      
-      // Get referred user info
-      const userResult = await pool.query(
-        'SELECT username, first_name, last_name FROM telegram_users WHERE id = $1',
-        [userIdNum]
-      );
-      
-      if (userResult.rows.length === 0) {
-        return { success: false, message: 'User not found in database' };
-      }
-      
-      const user = userResult.rows[0];
-      
-      // Add referral record and award points
-      const REFERRAL_POINTS = 30;
-      
-      // Add points to referrer
-      const pointsResult = await pool.query(
-        'SELECT add_points_to_user($1, $2) as new_points',
-        [referrerId, REFERRAL_POINTS]
-      );
-      
-      const newPoints = pointsResult.rows[0].new_points;
-      
-      // Create referral record
-      await pool.query(
-        'INSERT INTO referrals (referrer_id, referred_id, points_awarded) VALUES ($1, $2, $3)',
-        [referrerId, userIdNum, REFERRAL_POINTS]
-      );
-      
-      // Send notification to referrer if we have a client
-      if (this.bot) {
-        try {
-          const userDisplayName = user.first_name || user.username || 'A new user';
-          const notificationMessage = `🎉 Referral Bonus!\n\n${userDisplayName} has joined using your referral link!\n\nYou've received ${REFERRAL_POINTS} points as a reward. Your total points are now ${newPoints}.`;
-          
-          await this.bot.sendMessage(referrerId, notificationMessage);
-          
-          logger.info(`Sent referral notification to user ${referrerId}`);
-        } catch (msgError) {
-          logger.error('Error sending referral notification:', msgError);
-          // Continue even if notification fails
-        }
-      }
-
-      return { 
-        success: true, 
-        points: REFERRAL_POINTS,
-        referrer: {
-          id: referrerId,
-          username: referrer.username,
-          first_name: referrer.first_name,
-          last_name: referrer.last_name
-        }
-      };
-    } catch (error) {
-      logger.error('Error processing referral:', error);
-      return { success: false, message: 'Error processing referral' };
-    }
   }
 
-  async getUserReferralLink(userId) {
-    try {
-      const pool = require('./config/database');
 
-      // Ensure userId is a proper number (not a string)
-      const userIdNum = parseInt(userId, 10);
-      
-      if (isNaN(userIdNum)) {
-        logger.error('Invalid user ID:', userId);
-        return { success: false, message: 'Invalid user ID' };
-      }
-
-      // Get user's referral code
-      const result = await pool.query(
-        'SELECT referral_code FROM telegram_users WHERE id = $1',
-        [userIdNum]
-      );
-      
-      if (result.rows.length === 0 || !result.rows[0].referral_code) {
-        return { success: false, message: 'No referral code found for this user' };
-      }
-      
-      const referralCode = result.rows[0].referral_code;
-
-      // Prefer cached username from getMe; fall back to BOT_USERNAME if present; otherwise no link
-      const envBotUsername = process.env.BOT_USERNAME || '';
-      const botUsernameSource = this.botUsername || envBotUsername || '';
-
-      let referralLink = null;
-      if (botUsernameSource) {
-        referralLink = `https://t.me/${botUsernameSource}?start=ref${referralCode}`;
-      }
-
-      return { success: true, referralCode, referralLink };
-    } catch (error) {
-      logger.error('Error getting referral link:', error);
-      return { success: false, message: 'Error retrieving referral link' };
-    }
-  }
 
   async registerUser(sender) {
     try {
       const pool = require('./config/database');
-      
+
       // Make sure we're using the raw numeric ID
       const senderId = sender.id;
       const userIdNum = parseInt(senderId, 10);
-      
+
       if (isNaN(userIdNum)) {
         logger.error('Invalid user ID:', senderId);
         return { success: false, message: 'Invalid user ID' };
       }
-      
-      // Generate a random referral code if needed
-      const crypto = require('crypto');
-      const generateReferralCode = (length = 8) => {
-        const buffer = crypto.randomBytes(length);
-        return buffer.toString('base64')
-          .replace(/[+/=]/g, '')
-          .substring(0, length)
-          .toUpperCase();
-      };
 
       // Ensure user exists in database
       const userResult = await pool.query(
@@ -766,45 +620,15 @@ class TelegramBot {
         'last_active = NOW() ' +
         'RETURNING id, points, referral_code',
         [
-          userIdNum, 
-          sender.username || '', 
-          sender.first_name || '', 
-          sender.last_name || '', 
+          userIdNum,
+          sender.username || '',
+          sender.first_name || '',
+          sender.last_name || '',
           sender.language_code || 'en'
         ]
       );
-      
+
       const userData = userResult.rows[0];
-      
-      // If there's no referral code yet, generate one
-      if (!userData.referral_code) {
-        let referralCode;
-        let isCodeUnique = false;
-        
-        // Keep generating codes until we find a unique one
-        while (!isCodeUnique) {
-          referralCode = generateReferralCode();
-          
-          // Check if the code already exists
-          const existingCode = await pool.query(
-            'SELECT COUNT(*) FROM telegram_users WHERE referral_code = $1',
-            [referralCode]
-          );
-          
-          if (parseInt(existingCode.rows[0].count) === 0) {
-            isCodeUnique = true;
-          }
-        }
-        
-        // Update user with the new referral code
-        await pool.query(
-          'UPDATE telegram_users SET referral_code = $1 WHERE id = $2 RETURNING referral_code',
-          [referralCode, userIdNum]
-        );
-        
-        userData.referral_code = referralCode;
-      }
-      
       return { success: true, user: userData };
     } catch (error) {
       logger.error('Error registering user:', error);
@@ -1112,7 +936,7 @@ class TelegramBot {
   async startOnboarding(chatId, sender, userLang) {
     const questions = await this.getOnboardingQuestions();
     if (!questions.length) {
-      await pool.query('UPDATE telegram_users SET onboarding_completed = TRUE WHERE id = $1', [parseInt(sender.id, 10)]).catch(() => {});
+      await pool.query('UPDATE telegram_users SET onboarding_completed = TRUE WHERE id = $1', [parseInt(sender.id, 10)]).catch(() => { });
       return;
     }
 
@@ -1129,7 +953,7 @@ class TelegramBot {
     if (questionIndex >= questions.length) {
       // Done
       this.chatStates.delete(chatId);
-      await pool.query('UPDATE telegram_users SET onboarding_completed = TRUE WHERE id = $1', [st.userId]).catch(() => {});
+      await pool.query('UPDATE telegram_users SET onboarding_completed = TRUE WHERE id = $1', [st.userId]).catch(() => { });
       await this.bot.sendMessage(chatId, '✅ Thank you!');
       return;
     }
@@ -1490,7 +1314,7 @@ class TelegramBot {
       try {
         if (this.flow) await this.flow.stopFlow(msg.chat.id);
         await this.bot.sendMessage(msg.chat.id, '✅ Flow cancelled.');
-      } catch (e) {}
+      } catch (e) { }
     });
 
     // Restart flow
@@ -1552,7 +1376,7 @@ class TelegramBot {
               }
             }
           }
-        } catch {}
+        } catch { }
 
         await this.bot.sendMessage(msg.chat.id, '⚠️ Could not restart flow.');
       }
@@ -1682,8 +1506,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
         } else {
           await this.bot.sendMessage(
             msg.chat.id,
-            `⚠️ ${
-              referralInfo.message || 'Unable to generate referral link at this time.'
+            `⚠️ ${referralInfo.message || 'Unable to generate referral link at this time.'
             } Please try again later.`
           );
         }
@@ -1744,7 +1567,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
               message: `Flow multi toggle: ${slug} -> ${nodeText || nodeKey} toggled ${label}`,
               payload: { slug, nodeKey, nodeText, optionKey, label, callback_data: data }
             });
-          } catch {}
+          } catch { }
 
           await this.flow.toggleMulti({ chatId, lang: userLang || 'en', nodeKey, optionKey });
         }
@@ -1807,7 +1630,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
 
         // Disabled menu flow callbacks
         else if (data.startsWith('lang:')) {
-          await this.bot.answerCallbackQuery(query.id).catch(() => {});
+          await this.bot.answerCallbackQuery(query.id).catch(() => { });
           return;
           const lang = data.split(':')[1];
 
@@ -1829,7 +1652,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
 
         // Step 2: country selected -> ask for help topic (keep previous rows)
         else if (data.startsWith('country:')) {
-          await this.bot.answerCallbackQuery(query.id).catch(() => {});
+          await this.bot.answerCallbackQuery(query.id).catch(() => { });
           return;
           const parts = data.split(':');
           const lang = parts[1];
@@ -1852,7 +1675,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
 
         // Step 3: topic selected -> send canned answer
         else if (data.startsWith('topic:')) {
-          await this.bot.answerCallbackQuery(query.id).catch(() => {});
+          await this.bot.answerCallbackQuery(query.id).catch(() => { });
           return;
           const parts = data.split(':');
           const lang = parts[1];
@@ -1899,7 +1722,7 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
         }
 
         // Always answer callback to remove loading state in Telegram UI
-        await this.bot.answerCallbackQuery(query.id).catch(() => {});
+        await this.bot.answerCallbackQuery(query.id).catch(() => { });
       } catch (error) {
         logger.error('Error handling callback_query:', error);
       }
