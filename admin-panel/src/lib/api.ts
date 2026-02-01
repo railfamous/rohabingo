@@ -672,6 +672,11 @@ export const upsertModerationSetting = async (chatId: number, setting: Partial<M
   return response.data;
 };
 
+export const bulkUpsertModerationSetting = async (chatIds: number[], settings: Partial<ModerationSetting>): Promise<any> => {
+  const response = await api.post('/admin/moderation/settings/bulk', { chat_ids: chatIds, settings });
+  return response.data;
+};
+
 export type ScheduledPost = {
   id: number;
   chat_id: number;
@@ -691,6 +696,11 @@ export const getScheduledPosts = async (): Promise<{ posts: ScheduledPost[] }> =
 
 export const createScheduledPost = async (data: Partial<ScheduledPost>) => {
   const response = await api.post('/admin/moderation/scheduled-posts', data);
+  return response.data;
+};
+
+export const createBulkScheduledPost = async (validData: { chat_ids: number[], content_type: string, text?: string, media_url?: string, send_at: string }) => {
+  const response = await api.post('/admin/moderation/scheduled-posts/bulk', validData);
   return response.data;
 };
 

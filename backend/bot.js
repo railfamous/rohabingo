@@ -206,6 +206,7 @@ class TelegramBot {
 
         // Welcome new members (send in group)
         if (settings.welcome_enabled && Array.isArray(msg.new_chat_members) && msg.new_chat_members.length > 0) {
+          logger.info(`[Welcome] New members in chat ${chatId}: ${msg.new_chat_members.length}`);
           const text = String(settings.welcome_text || '').trim();
 
           const escapeHtml = (s) =>
@@ -231,18 +232,24 @@ class TelegramBot {
 
           if (text) {
             // Optional placeholders:
-            // - {new_member}: first joined member
+            // - {new_member} or {name}: first joined member
             // - {new_members}: comma-separated list (useful if multiple joined at once)
             let out = text;
-            if (out.includes('{new_member}') || out.includes('{new_members}')) {
-              out = out.replaceAll('{new_members}', membersText);
-              out = out.replaceAll('{new_member}', members[0] || membersText);
-            } else if (membersText) {
-              // If no placeholders are used, append the member(s) so the welcome always includes their name.
-              out = `${out}\n\n${membersText}`;
-            }
+            try {
+              if (out.includes('{new_member}') || out.includes('{new_members}') || out.includes('{name}')) {
+                out = out.replaceAll('{new_members}', membersText);
+                out = out.replaceAll('{new_member}', members[0] || membersText);
+                out = out.replaceAll('{name}', members[0] || membersText);
+              } else if (membersText) {
+                // If no placeholders are used, append the member(s) so the welcome always includes their name.
+                out = `${out}\n\n${membersText}`;
+              }
 
-            await this.bot.sendMessage(chatId, out, { parse_mode: 'HTML' });
+              await this.bot.sendMessage(chatId, out, { parse_mode: 'HTML' });
+              logger.info(`[Welcome] Sent welcome message to ${chatId}`);
+            } catch (err) {
+              logger.error(`[Welcome] Failed to send to ${chatId}:`, err);
+            }
           }
         }
 

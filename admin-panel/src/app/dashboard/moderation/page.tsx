@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   createScheduledPost,
+  createBulkScheduledPost, // Added
   deleteScheduledPost,
   getBotChats,
   BotChat,
@@ -13,6 +14,7 @@ import {
   getScheduledPosts,
   ScheduledPost,
   uploadFile,
+  bulkUpsertModerationSetting,
 } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,13 +24,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Shield, Clock, Plus, Trash2, Calendar, Image as ImageIcon, Video, UploadCloud, Loader2, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Shield, Clock, Plus, Trash2, Calendar, Image as ImageIcon, Video, UploadCloud, Loader2, Save, RefreshCw, CheckCircle2, ChevronsUpDown, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 
 export default function ModerationPage() {
   const [loading, setLoading] = useState(false);
 
-  // Destination for moderation settings (per chat)
+  // Destination (Multi-select). Format: "chatId:chatType"
+  const [selectedChats, setSelectedChats] = useState<string[]>([]);
+  const [openCombobox, setOpenCombobox] = useState(false);
+
+  // This determines which chat's settings are currently SHOWN in the form.
+  // When multiple are selected, this tracks the most recently clicked (or first).
   const [modChatDest, setModChatDest] = useState('');
   const [modSettingsMap, setModSettingsMap] = useState<Record<number, ModerationSetting>>({});
 
@@ -47,7 +58,6 @@ export default function ModerationPage() {
   const [botChats, setBotChats] = useState<BotChat[]>([]);
 
   // Schedule form
-  const [scheduleDest, setScheduleDest] = useState('');
   const [scheduleType, setScheduleType] = useState<'text' | 'photo' | 'video'>('text');
   const [scheduleText, setScheduleText] = useState('');
 
@@ -110,7 +120,10 @@ export default function ModerationPage() {
 
       if (!modChatDest && filteredChats.length > 0) {
         const c0 = filteredChats[0];
-        setModChatDest(`${c0.chat_id}:${c0.chat_type}`);
+        const val = `${c0.chat_id}:${c0.chat_type}`;
+        setModChatDest(val);
+        // Default to selecting the first one
+        if (selectedChats.length === 0) setSelectedChats([val]);
       }
     } catch (e: any) {
       toast.error('Failed to load settings');
@@ -183,19 +196,79 @@ export default function ModerationPage() {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label>Destination Chat</Label>
-                <Select value={modChatDest} onValueChange={setModChatDest}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a chat..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {botChats.length === 0 && <SelectItem value="none" disabled>No groups found</SelectItem>}
-                    {botChats.map((c) => (
-                      <SelectItem key={c.chat_id} value={`${c.chat_id}:${c.chat_type}`}>
-                        {c.title || c.username || c.chat_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      className="w-full justify-between"
+                    >
+                      {selectedChats.length > 0
+                        ? `${selectedChats.length} chat(s) selected`
+                        : "Select groups/channels..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search chat..." />
+                      <CommandList>
+                        <CommandEmpty>No chat found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            onSelect={() => {
+                              if (selectedChats.length === botChats.length) {
+                                setSelectedChats([]);
+                              } else {
+                                const all = botChats.map(c => `${c.chat_id}:${c.chat_type}`);
+                                setSelectedChats(all);
+                                if (all.length > 0) setModChatDest(all[0]);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={botChats.length > 0 && selectedChats.length === botChats.length}
+                                onCheckedChange={() => { }} // handled by CommandItem
+                              />
+                              <span>Select All ({botChats.length})</span>
+                            </div>
+                          </CommandItem>
+                          {botChats.map((chat) => {
+                            const val = `${chat.chat_id}:${chat.chat_type}`;
+                            return (
+                              <CommandItem
+                                key={chat.chat_id}
+                                value={chat.title || String(chat.chat_id)}
+                                onSelect={() => {
+                                  const isSelected = selectedChats.includes(val);
+                                  let newSelected;
+                                  if (isSelected) {
+                                    newSelected = selectedChats.filter((x) => x !== val);
+                                  } else {
+                                    newSelected = [...selectedChats, val];
+                                    setModChatDest(val);
+                                  }
+                                  setSelectedChats(newSelected);
+                                }}
+                              >
+                                <div className="flex items-center gap-2 w-full">
+                                  <Checkbox
+                                    checked={selectedChats.includes(val)}
+                                    onCheckedChange={() => { }}
+                                  />
+                                  <span className="truncate">{chat.title || chat.username || chat.chat_id}</span>
+                                  {val === modChatDest && <span className="ml-auto text-xs text-blue-500 font-mono">EDITING</span>}
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <p className="text-xs text-muted-foreground">The bot must be an Admin in the chat to enforce these rules.</p>
               </div>
 
@@ -273,33 +346,38 @@ export default function ModerationPage() {
                 )}
               </div>
 
-              <Button className="w-full mt-4" onClick={async () => {
+              <Button className="w-full mt-4" disabled={loading} onClick={async () => {
                 try {
-                  if (!modChatDest) { toast.error('Select a chat first'); return; }
-                  const [chatIdRaw, chatTypeRaw] = modChatDest.split(':');
-                  const chatId = Number(chatIdRaw);
+                  if (selectedChats.length === 0) { toast.error('Select at least one chat target'); return; }
+
+                  const chatIds = selectedChats.map(s => Number(s.split(':')[0]));
 
                   const seconds = uiToSeconds(autoMuteDurationValue, autoMuteDurationUnit);
                   const clampedSeconds = autoMute ? Math.max(30, seconds) : seconds;
 
-                  const r = await upsertModerationSetting(chatId, {
-                    chat_type: chatTypeRaw as any,
+                  const payload: Partial<ModerationSetting> = {
                     enabled,
                     welcome_enabled: welcomeEnabled,
                     welcome_text: welcomeText,
                     delete_links_enabled: deleteLinks,
                     auto_mute_enabled: autoMute,
                     auto_mute_seconds: clampedSeconds,
-                  });
+                  };
 
-                  setModSettingsMap((prev) => ({ ...prev, [chatId]: r.setting }));
-                  toast.success('Rules saved successfully');
-                } catch {
+                  setLoading(true);
+                  const r = await bulkUpsertModerationSetting(chatIds, payload);
+
+                  toast.success(`Rules saved for ${r.count} chat(s)`);
+                  await load(); // Reload to refresh map and ensure consistency
+                } catch (e) {
+                  console.error(e);
                   toast.error('Failed to save rules');
+                } finally {
+                  setLoading(false);
                 }
               }}>
                 <Save className="w-4 h-4 mr-2" />
-                Save Rules
+                Save Rules to {selectedChats.length} Chat(s)
               </Button>
             </CardContent>
           </Card>
@@ -320,18 +398,14 @@ export default function ModerationPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Destination</Label>
-                <Select value={scheduleDest} onValueChange={setScheduleDest}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {botChats.map((c) => (
-                      <SelectItem key={c.chat_id} value={`${c.chat_id}:${c.chat_type}`}>
-                        {c.title || c.username || c.chat_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="p-2 border rounded-md bg-muted/50 text-sm text-muted-foreground flex justify-between items-center">
+                  <span>
+                    {selectedChats.length > 0
+                      ? `${selectedChats.length} chat(s) selected via Moderation card`
+                      : 'No chats selected (select in Moderation card)'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">Tip: Use the selector in the "Moderation Rules" card to choose targets.</p>
               </div>
 
               <div className="space-y-2">
@@ -412,31 +486,35 @@ export default function ModerationPage() {
                 />
               </div>
 
-              <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={async () => {
+              <Button className="w-full bg-purple-600 hover:bg-purple-700" disabled={loading} onClick={async () => {
                 try {
-                  if (!scheduleDest) { toast.error('Select destination'); return; }
+                  if (selectedChats.length === 0) { toast.error('Select at least one destination in Moderation card'); return; }
                   if (!scheduleAt) { toast.error('Select time'); return; }
-                  const [chatIdRaw, chatTypeRaw] = scheduleDest.split(':');
 
-                  await createScheduledPost({
-                    chat_id: Number(chatIdRaw),
-                    chat_type: chatTypeRaw as any,
+                  const chatIds = selectedChats.map(s => Number(s.split(':')[0]));
+
+                  setLoading(true);
+                  await createBulkScheduledPost({
+                    chat_ids: chatIds,
                     content_type: scheduleType,
                     text: scheduleText,
                     media_url: scheduleMediaUrl,
                     send_at: new Date(scheduleAt).toISOString()
                   });
-                  toast.success('Post scheduled!');
-                  load();
+
+                  toast.success(`Post scheduled for ${chatIds.length} chat(s)!`);
+                  await load();
                   setScheduleText('');
                   setScheduleMediaUrl('');
                   setScheduleAt('');
                 } catch {
                   toast.error('Failed to schedule post');
+                } finally {
+                  setLoading(false);
                 }
               }}>
                 <Calendar className="w-4 h-4 mr-2" />
-                Schedule Post
+                Schedule Post to {selectedChats.length} Chat(s)
               </Button>
             </CardContent>
           </Card>

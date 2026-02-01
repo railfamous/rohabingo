@@ -160,11 +160,134 @@ router.post('/scheduled-posts', adminAuth, async (req, res) => {
   }
 });
 
+// Bulk schedule posts
+router.post('/scheduled-posts/bulk', adminAuth, async (req, res) => {
+  const body = req.body || {};
+  const { chat_ids, content_type = 'text', text, media_url, send_at } = body;
+
+  if (!Array.isArray(chat_ids) || chat_ids.length === 0) {
+    return res.status(400).json({ message: 'chat_ids must be a non-empty array' });
+  }
+  if (!send_at) return res.status(400).json({ message: 'send_at required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch chat types
+    const chatTypesRes = await client.query('SELECT chat_id, chat_type FROM bot_chats WHERE chat_id = ANY($1::bigint[])', [chat_ids]);
+    const typeMap = new Map();
+    chatTypesRes.rows.forEach(r => typeMap.set(String(r.chat_id), r.chat_type));
+
+    const posts = [];
+    for (const chatId of chat_ids) {
+      let type = typeMap.get(String(chatId)) || 'group';
+      const r = await client.query(
+        `INSERT INTO scheduled_posts (chat_id, chat_type, content_type, text, media_url, send_at)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING *`,
+        [Number(chatId), type, String(content_type), text || null, media_url || null, send_at]
+      );
+      posts.push(r.rows[0]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Posts scheduled', count: posts.length, posts });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error('Bulk schedule error:', e);
+    res.status(500).json({ message: e?.message || 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
 router.delete('/scheduled-posts/:id', adminAuth, async (req, res) => {
   try {
     await pool.query('DELETE FROM scheduled_posts WHERE id=$1', [Number(req.params.id)]);
     res.json({ ok: true });
   } catch (e) {
+    res.status(500).json({ message: e?.message || 'Server error' });
+  }
+});
+
+// Bulk upsert moderation settings
+router.post('/settings/bulk', adminAuth, async (req, res) => {
+  const body = req.body || {};
+  const { chat_ids, settings } = body;
+
+  if (!Array.isArray(chat_ids) || chat_ids.length === 0) {
+    return res.status(400).json({ message: 'chat_ids must be a non-empty array' });
+  }
+
+  try {
+    const {
+      active, // boolean from UI specific to bulk 
+      welcome_enabled,
+      welcome_text,
+      delete_links_enabled,
+      auto_mute_enabled,
+      auto_mute_seconds,
+    } = settings || {};
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // We need to know chat_type for each chat to insert correctly if it doesn't exist.
+      // But typically we update existing chats. If a chat is in chat_ids, it should trigger an update/insert.
+      // We will try to fetch chat_type from bot_chats table.
+
+      const chatTypesRes = await client.query('SELECT chat_id, chat_type FROM bot_chats WHERE chat_id = ANY($1::bigint[])', [chat_ids]);
+      const typeMap = new Map();
+      chatTypesRes.rows.forEach(r => typeMap.set(String(r.chat_id), r.chat_type));
+
+      for (const chatId of chat_ids) {
+        let type = typeMap.get(String(chatId)) || 'group';
+
+        // Prepare values. Note: enabled/active might be passed as 'enabled' or 'active' depending on UI
+        const isEnabled = settings.enabled !== undefined ? settings.enabled : (active !== undefined ? active : true);
+
+        await client.query(
+          `INSERT INTO chat_moderation_settings (
+            chat_id, chat_type, enabled,
+            welcome_enabled, welcome_text,
+            delete_links_enabled,
+            auto_mute_enabled, auto_mute_seconds,
+            updated_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+          ON CONFLICT (chat_id) DO UPDATE SET
+            chat_type=EXCLUDED.chat_type,
+            enabled=EXCLUDED.enabled,
+            welcome_enabled=EXCLUDED.welcome_enabled,
+            welcome_text=EXCLUDED.welcome_text,
+            delete_links_enabled=EXCLUDED.delete_links_enabled,
+            auto_mute_enabled=EXCLUDED.auto_mute_enabled,
+            auto_mute_seconds=EXCLUDED.auto_mute_seconds,
+            updated_at=NOW()`,
+          [
+            chatId,
+            type,
+            isEnabled,
+            !!welcome_enabled,
+            welcome_text || null,
+            !!delete_links_enabled,
+            !!auto_mute_enabled,
+            Number(auto_mute_seconds || 3600),
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ message: 'Bulk settings updated', count: chat_ids.length });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('Bulk moderation error:', e);
     res.status(500).json({ message: e?.message || 'Server error' });
   }
 });
