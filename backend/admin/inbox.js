@@ -10,7 +10,7 @@ router.get('/conversations', adminAuth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 200);
     const result = await pool.query(
-      `SELECT c.*, tu.username, tu.first_name, tu.last_name
+      `SELECT c.*, tu.username, tu.first_name, tu.last_name, tu.photo_url
        FROM conversations c
        LEFT JOIN telegram_users tu ON tu.id = c.user_id
        ORDER BY c.last_message_at DESC NULLS LAST, c.updated_at DESC

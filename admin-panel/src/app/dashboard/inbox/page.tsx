@@ -26,6 +26,7 @@ type Conversation = {
   username?: string;
   first_name?: string;
   last_name?: string;
+  photo_url?: string;
 };
 
 type ConversationMessage = {
@@ -327,6 +328,7 @@ export default function InboxPage() {
                     ${selectedId === c.id ? 'bg-blue-50/50 hover:bg-blue-50' : ''}`}
                 >
                   <Avatar className="h-10 w-10 border relative">
+                    {c.photo_url && <AvatarImage src={c.photo_url} alt={name} />}
                     <AvatarFallback className="text-xs bg-blue-100 text-blue-700">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -370,6 +372,7 @@ export default function InboxPage() {
             <div className="h-16 border-b bg-white flex items-center justify-between px-6 shrink-0">
               <div className="flex items-center gap-3">
                 <Avatar className="h-9 w-9 border">
+                  {selectedConversation.photo_url && <AvatarImage src={selectedConversation.photo_url} alt={selectedConversation.username || 'User'} />}
                   <AvatarFallback className="bg-purple-100 text-purple-700">
                     {selectedConversation.username?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
