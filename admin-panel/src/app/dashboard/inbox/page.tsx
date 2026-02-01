@@ -73,6 +73,7 @@ export default function InboxPage() {
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [mediaFileName, setMediaFileName] = useState<string>('');
   const [replyTo, setReplyTo] = useState<ConversationMessage | null>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -160,11 +161,25 @@ export default function InboxPage() {
     return () => clearInterval(interval);
   }, [selectedId]);
 
+  /* Scroll handling */
+  const prevMetricsRef = useRef({ selectedId: null as number | null, length: 0 });
+
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (!messagesEndRef.current) return;
+
+    const { selectedId: prevId, length: prevLen } = prevMetricsRef.current;
+
+    // Case 1: Changed conversation or first load
+    if (selectedId !== prevId) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+    }
+    // Case 2: New messages arrived (and not explicitly highlighting an old one)
+    else if (messages.length > prevLen && !highlightedId) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-  }, [messages, selectedId]);
+
+    prevMetricsRef.current = { selectedId, length: messages.length };
+  }, [messages, selectedId, highlightedId]);
 
   const handleUpload = async (file: File) => {
     try {
@@ -227,6 +242,17 @@ export default function InboxPage() {
 
     setSending(false);
     sendingRef.current = false;
+  };
+
+  const scrollToMessage = (telegramId: number) => {
+    const el = document.getElementById(`msg-${telegramId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedId(telegramId);
+      setTimeout(() => setHighlightedId(null), 2000);
+    } else {
+      toast.error('Message not found (might be too old)');
+    }
   };
 
   const sendReply = async (e?: MouseEvent<HTMLButtonElement> | React.FormEvent) => {
@@ -410,7 +436,11 @@ export default function InboxPage() {
                 {messages.map((m) => {
                   const isOutbound = m.direction === 'outbound';
                   return (
-                    <div key={m.id} className="group relative">
+                    <div
+                      key={m.id}
+                      id={m.telegram_message_id ? `msg-${m.telegram_message_id}` : undefined}
+                      className="group relative"
+                    >
                       <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
                         <div className="flex items-end gap-2 max-w-[85%]">
                           {/* Reply Button (visible on hover) */}
@@ -423,16 +453,26 @@ export default function InboxPage() {
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-reply"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
                           </button>
 
-                          <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm border
-                            ${isOutbound
-                              ? 'bg-blue-600 text-white border-blue-600 rounded-br-none'
-                              : 'bg-white text-gray-800 border-gray-200 rounded-bl-none'
+                          <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm border transition-all duration-500
+                            ${highlightedId === m.telegram_message_id
+                              ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-100'
+                              : (isOutbound
+                                ? 'bg-blue-600 text-white border-blue-600 rounded-br-none'
+                                : 'bg-white text-gray-800 border-gray-200 rounded-bl-none'
+                              )
                             }
                           `}>
                             {/* Reply Context in Message Bubble */}
                             {m.telegram_reply_to_message_id && (
-                              <div className={`mb-2 pl-2 border-l-2 text-xs opacity-75 ${isOutbound ? 'border-white/50' : 'border-blue-500'}`}>
-                                <div className="font-semibold">Replying...</div>
+                              <div
+                                onClick={() => m.telegram_reply_to_message_id && scrollToMessage(m.telegram_reply_to_message_id)}
+                                className={`mb-2 pl-2 border-l-2 text-xs opacity-75 cursor-pointer hover:opacity-100 transition-opacity
+                                  ${isOutbound ? 'border-white/50' : 'border-blue-500'}`}
+                              >
+                                <div className="font-semibold flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+                                  Reply
+                                </div>
                               </div>
                             )}
 
