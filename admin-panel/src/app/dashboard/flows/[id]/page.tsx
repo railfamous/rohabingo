@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Save } from 'lucide-react';
+import { RefreshCw, Save, Smartphone, Plus, Trash2, GripVertical, ArrowRight, MessageCircle, List, Calendar, FileText, Hash, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,8 +22,18 @@ import {
   deleteFlowOption,
   validateFlowVersion
 } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-const NODE_TYPES = ['text','single_choice','multi_choice','number','date','file','end'] as const;
+const NODE_TYPES = [
+  { value: 'text', label: 'Message', icon: MessageCircle },
+  { value: 'single_choice', label: 'Single Choice', icon: List },
+  { value: 'multi_choice', label: 'Multiple Choice', icon: List },
+  { value: 'number', label: 'Number Input', icon: Hash },
+  { value: 'date', label: 'Date Input', icon: Calendar },
+  { value: 'file', label: 'File Upload', icon: FileText },
+  { value: 'end', label: 'End Flow', icon: CheckCircle2 },
+] as const;
 
 function humanizeFlowText(msg: string): string {
   let out = String(msg || '');
@@ -37,17 +47,10 @@ function humanizeFlowText(msg: string): string {
 function formatFlowError(err: any): string {
   const raw = String(err?.response?.data?.message || err?.message || '').trim();
   if (!raw) return 'Failed. Please check your Questions and Options.';
-
-  // Normalize wording from backend to UI-friendly text
   let msg = raw;
-
-  // Replace technical terms
   msg = humanizeFlowText(msg);
-
-  // Common patterns
   msg = msg.replace(/key not found/gi, 'Question not found');
   msg = msg.replace(/not found/gi, 'not found');
-
   return msg;
 }
 
@@ -64,6 +67,9 @@ export default function FlowEditPage() {
   const [options, setOptions] = useState<any[]>([]);
   const [savingAll, setSavingAll] = useState(false);
   const [reloading, setReloading] = useState(false);
+
+  // Preview State
+  const [previewNodeKey, setPreviewNodeKey] = useState<string | null>(null);
 
   const optionKeyToLabel = useMemo(() => {
     const m = new Map<string, string>();
@@ -88,7 +94,6 @@ export default function FlowEditPage() {
   }, [nodes]);
 
   const appendQuestionContext = (msg: string) => {
-    // If the message contains a Question ID, append its question text (if available)
     const m = msg.match(/Question ID\s*[:=]?\s*([A-Za-z0-9_\-]+)/i);
     const qid = m?.[1];
     if (!qid) return msg;
@@ -98,22 +103,24 @@ export default function FlowEditPage() {
   };
 
   const formatFlowErrorUi = (err: any) => {
-    // Start from the generic formatter (Question/Option wording)
     let msg = formatFlowError(err);
-
-    // Replace option_key values with their button text when possible
     msg = msg.replace(/\bopt_\d+\b/gi, (k) => optionKeyToLabel.get(k) || k);
-
-    // If it's option-related, include the source question
     msg = appendQuestionContext(msg);
-
     return msg;
   };
 
-  // Collapse/expand options per question
   const [collapsedOptions, setCollapsedOptions] = useState<Record<string, boolean>>({});
 
   const nodesById = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+  // Helper to get ALL available nodes for dropdowns (including partials in state)
+  const availableNodes = useMemo(() => {
+    return nodes.map(n => ({
+      value: n.node_key,
+      label: `${n.node_key} ${n.prompt_i18n?.en ? `- ${n.prompt_i18n.en.substring(0, 20)}...` : ''}`
+    }));
+  }, [nodes]);
+
+
   const optionsByNodeId = useMemo(() => {
     const m = new Map<number, any[]>();
     for (const o of options) {
@@ -122,7 +129,7 @@ export default function FlowEditPage() {
       m.set(o.flow_node_id, list);
     }
     for (const [k, list] of m.entries()) {
-      list.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       m.set(k, list);
     }
     return m;
@@ -141,6 +148,10 @@ export default function FlowEditPage() {
     setVersion(data.version);
     setNodes(data.nodes || []);
     setOptions(data.options || []);
+    // Set initial preview to start node if available
+    if (data.version?.start_node_key) {
+      setPreviewNodeKey(data.version.start_node_key);
+    }
   };
 
   useEffect(() => {
@@ -155,58 +166,11 @@ export default function FlowEditPage() {
   }, [selectedVersionId]);
 
   const ensureVersion = async (): Promise<number> => {
-    // Ensure there's an editable version selected.
     if (selectedVersionId) return selectedVersionId;
-
     const data = await createFlowVersion(flowId);
     await loadFlow();
     setSelectedVersionId(data.version.id);
     return data.version.id;
-  };
-
-  const onPublish = async () => {
-    if (!selectedVersionId) return;
-    try {
-      const v = await validateFlowVersion(selectedVersionId);
-      if (!v.ok) {
-        toast.error('Fix validation errors before publishing');
-        return;
-      }
-      await publishFlowVersion(selectedVersionId);
-      toast.success('Saved');
-      await loadFlow();
-    } catch (e: any) {
-      toast.error(formatFlowErrorUi(e));
-    }
-  };
-
-  const onValidate = async () => {
-    if (!selectedVersionId) return;
-    const v = await validateFlowVersion(selectedVersionId);
-    if (v.ok) toast.success('✅ Valid');
-    else {
-       const lines = (v.errors || []).map((e: string) => {
-         const base = humanizeFlowText(e);
-         const withOpt = base.replace(/\bopt_\d+\b/gi, (k) => optionKeyToLabel.get(k) || k);
-         return appendQuestionContext(withOpt);
-       });
-       toast.error(lines.join('\n'));
-     }
-  };
-
-  const onSetStart = async () => {
-    if (!selectedVersionId) return;
-    if (!version?.start_node_key) {
-      toast.error('Set the First Question ID first');
-      return;
-    }
-    try {
-      await setFlowStartNode(selectedVersionId, version.start_node_key);
-      toast.success('Start node set');
-      await loadVersion(selectedVersionId);
-    } catch (e: any) {
-      toast.error(formatFlowErrorUi(e));
-    }
   };
 
   const onUpsertNode = async (nodeKey: string) => {
@@ -228,18 +192,6 @@ export default function FlowEditPage() {
     await loadVersion(selectedVersionId);
   };
 
-  const onUpsertOption = async (nodeId: number, optionKey: string) => {
-    try {
-      const list = optionsByNodeId.get(nodeId) || [];
-      const existing = list.find(o => o.option_key === optionKey) || { option_key: optionKey };
-      await upsertFlowOption(nodeId, optionKey, existing);
-      toast.success('Option saved');
-      await loadVersion(selectedVersionId!);
-    } catch (e: any) {
-      toast.error(formatFlowErrorUi(e));
-    }
-  };
-
   const onDeleteOption = async (nodeId: number, optionKey: string) => {
     if (!confirm(`Delete option ${optionKey}?`)) return;
     await deleteFlowOption(nodeId, optionKey);
@@ -249,23 +201,18 @@ export default function FlowEditPage() {
   const onSaveFlowAll = async () => {
     try {
       setSavingAll(true);
-
       const versionId = await ensureVersion();
 
-      // Save all questions first (ensures node ids exist)
       const nodesSorted = [...nodes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       for (const n of nodesSorted) {
         if (!n?.node_key) continue;
         await upsertFlowNode(versionId, n.node_key, n);
       }
 
-      // Save first question (start node)
       if (version?.start_node_key) {
         await setFlowStartNode(versionId, version.start_node_key);
       }
 
-      // Do NOT reload the page state here.
-      // We only need the latest node ids from the server, without wiping unsaved UI edits.
       const currentNodes = await getFlowVersion(flowId, versionId);
       const nodeKeyToId = new Map((currentNodes.nodes || []).map((n: any) => [n.node_key, n.id]));
 
@@ -277,7 +224,6 @@ export default function FlowEditPage() {
 
       for (const o of optionsSorted) {
         if (!o) continue;
-        // If option is linked by node_key instead of flow_node_id, repair it
         if (!o.flow_node_id && o.node_key && nodeKeyToId.has(o.node_key)) {
           o.flow_node_id = nodeKeyToId.get(o.node_key);
         }
@@ -285,7 +231,6 @@ export default function FlowEditPage() {
         await upsertFlowOption(o.flow_node_id, o.option_key, o);
       }
 
-      // Validate then auto-publish
       const vres = await validateFlowVersion(versionId);
       if (!vres.ok) {
         const lines = (vres.errors || []).map((e: string) => {
@@ -298,7 +243,7 @@ export default function FlowEditPage() {
       }
 
       await publishFlowVersion(versionId);
-      toast.success('✅ Saved');
+      toast.success('✅ Saved & Published');
       await loadFlow();
       await loadVersion(versionId);
     } catch (e: any) {
@@ -321,352 +266,362 @@ export default function FlowEditPage() {
     }
   };
 
-  if (!flow) return <div>Loading...</div>;
+  // --- Rendering ---
+
+  if (!flow) return <div className="p-8 text-center text-gray-500">Loading flow...</div>;
+
+  const previewNode = nodes.find(n => n.node_key === previewNodeKey) || nodes[0];
+  const previewOptions = previewNode
+    ? (previewNode.id
+      ? (optionsByNodeId.get(previewNode.id) || [])
+      : options.filter(o => o.node_key === previewNode.node_key)
+    )
+    : [];
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Flow: {flow.title} ({flow.slug})</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2 items-center">
-          <div className="ml-auto flex gap-2 items-center">
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center gap-2"
-              disabled={reloading || savingAll}
-            >
-              <RefreshCw className={`h-4 w-4 ${reloading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-            <button
-              type="button"
-              onClick={onSaveFlowAll}
-              className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
-              disabled={savingAll}
-            >
-              <Save className="h-4 w-4 text-white" />
-              <span>{savingAll ? 'Saving...' : 'Save Changes'}</span>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="h-[calc(100vh-6rem)] flex flex-col gap-4">
+      {/* Header */}
+      <div className="bg-white p-4 border rounded-xl flex items-center justify-between shadow-sm">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <span className="text-gray-500">{flow.slug} /</span>
+            {flow.title}
+          </h1>
+          <div className="text-xs text-gray-500 mt-1">Status: {version?.status || 'draft'} • Version: {version?.version || 1}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={reloading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${reloading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={onSaveFlowAll} disabled={savingAll} className="bg-blue-600 hover:bg-blue-700">
+            <Save className="w-4 h-4 mr-2" />
+            {savingAll ? 'Saving...' : 'Save & Publish'}
+          </Button>
+        </div>
+      </div>
 
-      {version && (
-        <Card>
-          <CardHeader>
-            <CardTitle>First Question</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-            <div>
-              <Label>First Question ID (start)</Label>
-              <Input value={version.start_node_key || ''} onChange={(e) => setVersion({ ...version, start_node_key: e.target.value })} placeholder="e.g. question_1" />
-            </div>
-            
-          </CardContent>
-        </Card>
-      )}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+        {/* Left: Editor */}
+        <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden h-full">
+          <ScrollArea className="h-full pr-4">
+            <div className="space-y-6 pb-20">
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Questions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!selectedVersionId) return;
+              {/* Start Node Config */}
+              <Card className="border-blue-100 bg-blue-50/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                    <ArrowRight className="w-4 h-4" /> Entry Point
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <Label className="whitespace-nowrap">Start Question:</Label>
+                    <Select
+                      value={version?.start_node_key || ''}
+                      onValueChange={(v) => {
+                        setVersion({ ...version, start_node_key: v });
+                        setPreviewNodeKey(v);
+                      }}
+                    >
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Select first question..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {nodes.map(n => (
+                          <SelectItem key={n.node_key} value={n.node_key}>
+                            {n.node_key} ({n.type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-                // Auto-generate a short unique Question ID (no popup).
-                // Format: question_1, question_2, ...
-                const used = new Set(nodes.map((x) => String(x.node_key || '').toLowerCase()));
-                let i = 1;
-                while (used.has(`question_${i}`)) i += 1;
-                const nk = `question_${i}`;
+              {/* Nodes List */}
+              {nodes
+                .slice()
+                .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                .map((n, idx) => {
+                  const isChoice = n.type === 'single_choice' || n.type === 'multi_choice';
+                  const optList = n.id ? (optionsByNodeId.get(n.id) || []) : options.filter((o) => o.node_key === n.node_key);
+                  const isCollapsed = collapsedOptions[n.node_key] !== false;
+                  const isPreviewing = previewNodeKey === n.node_key;
 
-                // Temp key so React keys stay stable while user edits Question ID.
-                const tmp =
-                  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                    ? // @ts-ignore
-                      crypto.randomUUID()
-                    : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+                  return (
+                    <Card
+                      key={n.node_key}
+                      className={`transition-all ${isPreviewing ? 'ring-2 ring-blue-500 shadow-md' : 'border-gray-200 hover:border-blue-300'}`}
+                      onClick={() => setPreviewNodeKey(n.node_key)}
+                    >
+                      <CardHeader className="py-3 px-4 bg-gray-50/50 border-b flex flex-row items-center justify-between cursor-pointer" >
+                        <div className="flex items-center gap-3">
+                          <div className="bg-white p-2 rounded-md border shadow-sm">
+                            {NODE_TYPES.find(t => t.value === n.type)?.icon({ className: "w-5 h-5 text-gray-500" }) || <MessageCircle className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm flex items-center gap-2">
+                              {n.node_key}
+                              <Badge variant="outline" className="text-[10px] h-5 font-normal text-gray-500">{n.type}</Badge>
+                            </div>
+                            <div className="text-xs text-gray-400 truncate max-w-[300px]">
+                              {n.prompt_i18n?.en || 'No text set...'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-400 hover:text-red-500 hover:bg-red-50"
+                            onClick={(e) => { e.stopPropagation(); onDeleteNode(n.node_key); }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
 
-                // Insert new question at the TOP
-                const bumped = nodes.map((x) => ({ ...x, sort_order: (x.sort_order ?? 0) + 1 }));
-                setNodes([
-                  {
-                    __tempKey: tmp,
+                      <CardContent className="p-4 space-y-4">
+                        {/* Base Config: ID, Type, Next */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Question ID</Label>
+                            <Input
+                              value={n.node_key}
+                              onChange={(e) => setNodes(nodes.map((x) => (x === n ? { ...x, node_key: e.target.value } : x)))}
+                              className="font-mono text-xs h-9"
+                              placeholder="unique_id"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Type</Label>
+                            <Select value={n.type} onValueChange={(v) => setNodes(nodes.map(x => x.node_key === n.node_key ? { ...x, type: v } : x))}>
+                              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {NODE_TYPES.map(t => (
+                                  <SelectItem key={t.value} value={t.value} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <t.icon className="w-4 h-4" /> {t.label}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Next Question (Default)</Label>
+                            <Select
+                              value={n.next_node_key || 'end_flow'}
+                              onValueChange={(v) => setNodes(nodes.map(x => x.node_key === n.node_key ? { ...x, next_node_key: v === 'end_flow' ? null : v } : x))}
+                            >
+                              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select next..." /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="end_flow" className="text-red-500 font-medium">End Flow</SelectItem>
+                                {nodes.filter(x => x.node_key !== n.node_key).map(x => (
+                                  <SelectItem key={x.node_key} value={x.node_key} className="text-xs">
+                                    {x.node_key}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Prompt */}
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Message Text</Label>
+                          <Textarea
+                            value={n.prompt_i18n?.en || ''}
+                            onChange={(e) => setNodes(nodes.map((x) => x.node_key === n.node_key ? { ...x, prompt_i18n: { ...(x.prompt_i18n || {}), en: e.target.value } } : x))}
+                            className="min-h-[80px] text-sm resize-none"
+                            placeholder="What would you like to ask?"
+                          />
+                        </div>
+
+                        {/* Options Builder */}
+                        {isChoice && (
+                          <div className="bg-gray-50 rounded-lg p-3 border">
+                            <div className="flex items-center justify-between mb-3">
+                              <Label className="text-xs font-semibold text-gray-700">Options</Label>
+                              <Button size="sm" variant="outline" className="h-7 text-xs"
+                                onClick={() => {
+                                  const existingKeys = new Set((optList || []).map((x: any) => String(x.option_key)));
+                                  let i = 1;
+                                  while (existingKeys.has(`opt_${i}`)) i++;
+                                  setOptions([...options, {
+                                    flow_node_id: n.id || null,
+                                    node_key: n.node_key,
+                                    option_key: `opt_${i}`,
+                                    label_i18n: { en: `Option ${i}` },
+                                    sort_order: (optList || []).length
+                                  }]);
+                                }}
+                              >
+                                <Plus className="w-3 h-3 mr-1" /> Add Option
+                              </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                              {(optList || [])
+                                .slice()
+                                .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                                .map((o: any, oIdx) => (
+                                  <div key={o.option_key} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded border shadow-sm">
+                                    <div className="col-span-5">
+                                      <Input
+                                        className="h-8 text-xs"
+                                        placeholder="Label"
+                                        value={o.label_i18n?.en || ''}
+                                        onChange={(e) => setOptions(options.map(x => (x === o ? { ...x, label_i18n: { ...x.label_i18n, en: e.target.value } } : x)))}
+                                      />
+                                    </div>
+                                    <div className="col-span-1 text-center text-gray-400">
+                                      <ArrowRight className="w-4 h-4 mx-auto" />
+                                    </div>
+                                    <div className="col-span-5">
+                                      <Select
+                                        value={o.next_node_key || 'default'}
+                                        onValueChange={(v) => setOptions(options.map(x => (x === o ? { ...x, next_node_key: v === 'default' ? null : v } : x)))}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Use Default" /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="default" className="text-gray-500 italic">Use Default Next</SelectItem>
+                                          {nodes.filter(x => x.node_key !== n.node_key).map(x => (
+                                            <SelectItem key={x.node_key} value={x.node_key} className="text-xs">{x.node_key}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="col-span-1 text-right">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-red-400 hover:text-red-500"
+                                        onClick={() => {
+                                          if (!n.id) {
+                                            setOptions(options.filter(x => x !== o));
+                                          } else {
+                                            onDeleteOption(n.id, o.option_key);
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+
+              <Button
+                onClick={() => {
+                  if (!selectedVersionId) return;
+                  const used = new Set(nodes.map((x) => String(x.node_key || '').toLowerCase()));
+                  let i = 1;
+                  while (used.has(`question_${i}`)) i += 1;
+                  const nk = `question_${i}`;
+                  setNodes([...nodes, {
                     flow_version_id: selectedVersionId,
                     node_key: nk,
                     type: 'text',
                     prompt_i18n: { en: '' },
-                    help_i18n: {},
-                    required: true,
-                    next_node_key: null,
-                    sort_order: 0
-                  },
-                  ...bumped
-                ]);
-              }}
-            >
-              + Add Question
-            </Button>
-          </div>
+                    sort_order: nodes.length
+                  }]);
+                  setTimeout(() => setPreviewNodeKey(nk), 100);
+                }}
+                className="w-full py-6 border-dashed border-2 border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:border-gray-400"
+                variant="ghost"
+              >
+                <Plus className="w-5 h-5 mr-2" /> Add New Question
+              </Button>
+            </div>
+          </ScrollArea>
+        </div>
 
-          <div className="space-y-4">
-            {nodes
-              .slice()
-              .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-              .map((n, idx) => {
-              const isChoice = n.type === 'single_choice' || n.type === 'multi_choice';
-              const optList = n.id
-                ? (optionsByNodeId.get(n.id) || [])
-                : options.filter((o) => o.node_key === n.node_key);
-              const nKey = n.id ? `id-${n.id}` : `tmp-${n.__tempKey || n.node_key}`;
-              const isCollapsed = collapsedOptions[n.node_key] !== false; // default collapsed
+        {/* Right: Smartphone Preview */}
+        <div className="hidden lg:block lg:col-span-1 relative">
+          <div className="sticky top-6">
+            <div className="w-[320px] mx-auto bg-gray-900 rounded-[3rem] p-4 shadow-2xl border-8 border-gray-800 relative aspect-[9/19] overflow-hidden">
+              {/* Notch */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-800 rounded-b-xl z-20"></div>
 
-              return (
-                <Card key={nKey} className="overflow-hidden border border-gray-200 shadow-sm">
-                  <CardHeader className="py-4 bg-gradient-to-b from-gray-50 to-white">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-xs text-muted-foreground">Question {idx + 1}</div>
-                        <div className="mt-1 flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs px-2 py-1 rounded bg-muted">
-                            {n.node_key}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded border bg-blue-50 text-blue-700 border-blue-100">
-                            {n.type}
-                          </span>
+              {/* Screen */}
+              <div className="bg-[#0e1621] w-full h-full rounded-[2rem] overflow-hidden flex flex-col relative text-white text-sm font-sans">
+                {/* Chat Header */}
+                <div className="h-14 bg-[#17212b] flex items-center px-4 pt-2 z-10 shrink-0 border-b border-gray-800">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold mr-3">BOT</div>
+                  <div>
+                    <div className="font-medium text-sm">BotDash</div>
+                    <div className="text-[10px] text-blue-400">bot</div>
+                  </div>
+                </div>
+
+                {/* Chat Area */}
+                <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-[url('https://telegram.org/file/464001088/1/bO-E-8y8B1I.73359/17f8d6899e3f890289')] bg-cover bg-center bg-gray-900/90 bg-blend-overlay">
+                  {!previewNode ? (
+                    <div className="flex h-full items-center justify-center text-gray-500 text-xs italic">
+                      Select a question to preview
+                    </div>
+                  ) : (
+                    <>
+                      {/* Incoming Message Bubble */}
+                      <div className="flex items-end gap-2 max-w-[90%]">
+                        <div className="w-6 h-6 rounded-full bg-blue-500 shrink-0 mb-1"></div>
+                        <div className="bg-[#182533] p-3 rounded-2xl rounded-bl-sm shadow-sm border border-gray-800 backdrop-blur-sm">
+                          <div className="text-[13px] leading-relaxed whitespace-pre-wrap">
+                            {previewNode.prompt_i18n?.en || '...'}
+                          </div>
+                          <div className="text-[9px] text-gray-500 text-right mt-1">12:00 PM</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {isChoice && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              setCollapsedOptions((prev) => ({
-                                ...prev,
-                                [n.node_key]: !(prev[n.node_key] !== false),
-                              }))
-                            }
-                            className="rounded-lg"
-                          >
-                            {isCollapsed ? 'Expand' : 'Collapse'}
-                          </Button>
+                      {/* Buttons / Input Preview */}
+                      <div className="mt-4">
+                        {previewNode.type === 'text' && (
+                          <div className="bg-[#17212b] p-2 rounded-t-xl opacity-50 border-t border-gray-700">
+                            <div className="text-xs text-gray-400 px-2 italic">User types reply...</div>
+                          </div>
                         )}
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onDeleteNode(n.node_key)}
-                          aria-label="Delete question"
-                          className="p-2 h-8 w-8 rounded-lg inline-flex items-center justify-center border-red-500 text-red-500 hover:bg-red-50 cursor-pointer"
-                        >
-                          <svg
-                            className="w-4 h-4 text-red-500"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Question ID</Label>
-                        {!n.id ? (
-                          <Input
-                            value={n.node_key}
-                            onChange={(e) => {
-                              const nextKey = e.target.value;
-                              setNodes(nodes.map((x) => (x === n ? { ...x, node_key: nextKey } : x)));
-                            }}
-                            placeholder="Question ID"
-                            className="font-mono"
-                          />
-                        ) : (
-                          <Input value={n.node_key} disabled className="font-mono bg-muted/30" />
-                        )}
-                      </div>
-
-                      <div>
-                        <Label>Question Type</Label>
-                        <Select value={n.type} onValueChange={(v) => setNodes(nodes.map(x => x.node_key===n.node_key ? { ...x, type: v } : x))}>
-                          <SelectTrigger className="w-full rounded-lg"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {NODE_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Question text (English)</Label>
-                      <Textarea
-                        value={n.prompt_i18n?.en || ''}
-                        onChange={(e) =>
-                          setNodes(
-                            nodes.map((x) =>
-                              x.node_key === n.node_key
-                                ? { ...x, prompt_i18n: { ...(x.prompt_i18n || {}), en: e.target.value } }
-                                : x
-                            )
-                          )
-                        }
-                        className="min-h-[88px] rounded-lg"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Go to Question ID (Next)</Label>
-                      <Input
-                        value={n.next_node_key || ''}
-                        onChange={(e) => setNodes(nodes.map(x => x.node_key===n.node_key ? { ...x, next_node_key: e.target.value || null } : x))}
-                        className="rounded-lg"
-                      />
-                    </div>
-
-                    {isChoice && !isCollapsed && (
-                      <div className="border rounded-xl p-4 bg-white">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <div className="font-semibold">Options for: {n.node_key}</div>
-                            <div className="text-xs text-muted-foreground">Shown under this question. Telegram buttons will be shown in one row.</div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const existingKeys = new Set((optList || []).map((x: any) => String(x.option_key)));
-                                let i = (optList || []).length + 1;
-                                let key = `opt_${i}`;
-                                while (existingKeys.has(key)) {
-                                  i += 1;
-                                  key = `opt_${i}`;
-                                }
-
-                                setOptions([
-                                  ...options,
-                                  {
-                                    flow_node_id: n.id || null,
-                                    node_key: n.node_key,
-                                    option_key: key,
-                                    label_i18n: { en: '' },
-                                    next_node_key: null,
-                                    sort_order: (optList || []).length
-                                  }
-                                ]);
-                              }}
-                              className="rounded-lg"
-                            >
-                              + Add Option
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          {(optList || [])
-                            .slice()
-                            .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-                            .map((o: any) => (
-                              <div key={o.option_key} className="rounded-xl border bg-gray-50/70 p-3">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-                                  <div className="md:col-span-2">
-                                    <Label className="text-xs">Button text (English)</Label>
-                                    <Input
-                                      className="w-full bg-white dark:bg-neutral-950 rounded-lg"
-                                      value={o.label_i18n?.en || ''}
-                                      onChange={(e) =>
-                                        setOptions(
-                                          options.map((x) =>
-                                            (((n.id && x.flow_node_id === n.id) || (!n.id && x.node_key === n.node_key)) && x.option_key === o.option_key)
-                                              ? { ...x, label_i18n: { ...(x.label_i18n || {}), en: e.target.value } }
-                                              : x
-                                          )
-                                        )
-                                      }
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label className="text-xs">Go to Question ID (Next)</Label>
-                                    <Input
-                                      className="w-full bg-white dark:bg-neutral-950 rounded-lg"
-                                      value={o.next_node_key || ''}
-                                      onChange={(e) =>
-                                        setOptions(
-                                          options.map((x) =>
-                                            (((n.id && x.flow_node_id === n.id) || (!n.id && x.node_key === n.node_key)) && x.option_key === o.option_key)
-                                              ? { ...x, next_node_key: e.target.value || null }
-                                              : x
-                                          )
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="flex justify-end mt-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      if (!n.id) {
-                                        setOptions((prev) => prev.filter((x) => !(x.node_key === n.node_key && x.option_key === o.option_key)));
-                                        return;
-                                      }
-                                      onDeleteOption(n.id, o.option_key);
-                                    }}
-                                    aria-label="Delete option"
-                                    className="p-2 h-8 w-8 rounded-lg inline-flex items-center justify-center border-red-500 text-red-500 hover:bg-red-50 cursor-pointer"
-                                  >
-                                    <svg
-                                      className="w-4 h-4 text-red-500"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <circle cx="12" cy="12" r="9" />
-                                      <line x1="9" y1="9" x2="15" y2="15" />
-                                      <line x1="15" y1="9" x2="9" y2="15" />
-                                    </svg>
-                                  </Button>
-                                </div>
+                        {(previewNode.type === 'single_choice' || previewNode.type === 'multi_choice') && (
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {(previewOptions || []).map((o: any) => (
+                              <div key={o.option_key || 'new'} className="bg-[#2b5278] hover:bg-[#34628e] text-white py-2 px-4 rounded-md text-xs font-medium cursor-default shadow-sm transition-colors border-b-2 border-[#1e3a56]">
+                                {o.label_i18n?.en || 'Option'}
                               </div>
                             ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                            {(previewOptions || []).length === 0 && (
+                              <div className="text-[10px] text-gray-500 italic">No options added yet</div>
+                            )}
+                          </div>
+                        )}
 
+                        {/* Other type hints */}
+                        {previewNode.type === 'file' && (
+                          <div className="flex justify-center mt-2">
+                            <div className="bg-[#17212b] text-blue-400 py-2 px-4 rounded-full text-xs flex items-center gap-2 border border-blue-500/30">
+                              <FileText className="w-3 h-3" /> Upload File
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-center mt-4 text-xs text-muted-foreground">
+              Live Preview • {previewNode?.node_key}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
