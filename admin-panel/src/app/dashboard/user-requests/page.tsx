@@ -138,7 +138,7 @@ export default function UserRequestsPage() {
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-600" />
-              Requests
+              Support Tickets
             </h2>
             <Button variant="ghost" size="icon" onClick={fetchData} disabled={loading} className="h-8 w-8">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -235,7 +235,10 @@ export default function UserRequestsPage() {
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
               <MessageSquare className="w-8 h-8 text-gray-300" />
             </div>
-            <p>Select a request to view details</p>
+            <p className="font-medium text-gray-500">Select a ticket to view details</p>
+            <p className="text-xs max-w-xs text-center">
+              Support tickets are created when users message the bot directly or use the "Contact Support" feature. Use this page to reply manually.
+            </p>
           </div>
         ) : (
           <>
@@ -283,76 +286,102 @@ export default function UserRequestsPage() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 bg-white/50">
+            <ScrollArea className="flex-1 bg-[#0e1621]">
               <div className="p-6 space-y-6">
-                {/* Metadata Cards */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="bg-gray-50/50 border-gray-100 shadow-none">
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-xs font-semibold uppercase text-gray-500">Source</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 text-sm font-medium">
-                      {humanizeSource(selected.source)}
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gray-50/50 border-gray-100 shadow-none">
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-xs font-semibold uppercase text-gray-500">Action Context</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 text-sm font-medium break-words">
-                      {humanizeAction(selected.action_key, selected.payload)}
-                    </CardContent>
-                  </Card>
-                </div>
 
-                {/* Message Content */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Message Content</h3>
-                  <div className="p-4 rounded-xl bg-white border shadow-sm text-sm leading-relaxed whitespace-pre-wrap text-gray-800">
-                    {selected.message}
+                {/* Ticket Info (System Message) */}
+                <div className="flex justify-center">
+                  <div className="bg-[#182533] text-gray-400 text-xs px-4 py-2 rounded-full border border-gray-800 flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-gray-500 uppercase tracking-wider">Channel:</span>
+                      <span className="text-gray-300">{humanizeSource(selected.source)}</span>
+                    </span>
+                    <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-gray-500 uppercase tracking-wider">Activity:</span>
+                      <span className="text-gray-300">{humanizeAction(selected.action_key, selected.payload)}</span>
+                    </span>
                   </div>
                 </div>
 
-                {/* Admin Reply History (if any - though DB only stores last reply, implementation shows we can just show last reply state) */}
+                {/* User Message (Left) */}
+                <div className="flex items-end gap-3 justify-start">
+                  <Avatar className="h-8 w-8 border border-gray-700 shadow-sm shrink-0 mb-1">
+                    {selected.photo_url && <AvatarImage src={selected.photo_url} />}
+                    <AvatarFallback className="text-xs bg-blue-600 text-white">
+                      {(selected.first_name?.[0] || selected.username?.[0] || 'U').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col gap-1 max-w-[80%]">
+                    <span className="text-xs text-gray-500 ml-1">{selected.first_name || 'User'}</span>
+                    <div className="bg-[#182533] p-3 rounded-2xl rounded-bl-none border border-gray-800 text-white text-sm whitespace-pre-wrap leading-relaxed shadow-sm">
+                      {selected.message}
+                    </div>
+                    <span className="text-[10px] text-gray-600 ml-1">
+                      {new Date(selected.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Admin Reply (Right) */}
                 {selected.admin_reply && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Latest Admin Reply</h3>
-                    <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 text-sm leading-relaxed whitespace-pre-wrap text-blue-900">
-                      {selected.admin_reply}
-                      <div className="mt-2 text-xs text-blue-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Replied at {selected.replied_at ? new Date(selected.replied_at).toLocaleString() : 'Unknown'}
+                  <div className="flex items-end gap-3 justify-end">
+                    <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                      <span className="text-xs text-gray-500 mr-1">Support Agent</span>
+                      <div className="bg-[#2b5278] p-3 rounded-2xl rounded-br-none text-white text-sm whitespace-pre-wrap leading-relaxed shadow-sm">
+                        {selected.admin_reply}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-gray-500 mr-1">
+                        <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                        <span>Sent {selected.replied_at ? new Date(selected.replied_at).toLocaleString() : ''}</span>
                       </div>
                     </div>
+                    <Avatar className="h-8 w-8 border border-gray-700 shadow-sm shrink-0 mb-1">
+                      <AvatarFallback className="bg-green-600 text-white">A</AvatarFallback>
+                    </Avatar>
                   </div>
                 )}
               </div>
             </ScrollArea>
 
-            <div className="p-4 border-t bg-white space-y-4">
-              <div className="flex items-start gap-4">
-                <Avatar className="h-8 w-8 mt-1">
-                  <AvatarFallback className="bg-gray-100">A</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-4">
-                  <Textarea
-                    placeholder="Type your reply to the user... (This will be sent as a bot message)"
-                    className="min-h-[100px] bg-gray-50/50 resize-none focus:bg-white transition-colors"
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                  />
-                  <div className="flex justify-end gap-2">
-                    {selected.status !== 'closed' && (
-                      <Button variant="outline" size="sm" onClick={() => updateStatus(selected.id, 'closed')}>
-                        Close Request
-                      </Button>
-                    )}
-                    <Button onClick={sendReply} disabled={sending || !reply.trim()} size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      {sending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                      Send Reply & Close
-                    </Button>
-                  </div>
-                </div>
+            <div className="p-4 bg-white border-t">
+              <div className="flex items-end gap-2 bg-gray-50 border rounded-2xl p-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                <Textarea
+                  placeholder="Type your reply..."
+                  className="min-h-[44px] max-h-[120px] bg-transparent border-0 focus-visible:ring-0 resize-none py-2.5 text-sm"
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={sendReply}
+                  disabled={sending || !reply.trim()}
+                  size="icon"
+                  className="h-9 w-9 mb-1 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  {sending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              <div className="flex justify-between items-center mt-2 px-1">
+                <p className="text-[10px] text-gray-400">
+                  Press Enter to send • Shift+Enter for new line
+                </p>
+                {selected.status !== 'closed' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => updateStatus(selected.id, 'closed')}
+                    className="text-xs h-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                  >
+                    Close Ticket
+                  </Button>
+                )}
               </div>
             </div>
           </>
