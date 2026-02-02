@@ -1291,10 +1291,20 @@ class TelegramBot {
                 if (t) await this.humanSendText(msg.chat.id, t, { parse_mode: 'HTML' });
               } else if (type === 'link') {
                 const title = String(payload.title || '').trim() || 'Link';
-                const url = String(payload.url || '').trim();
+                const text = String(payload.text || '').trim(); // Optional body text
+                let url = String(payload.url || '').trim();
+                // Ensure protocol
+                if (url && !/^https?:\/\//i.test(url)) {
+                  url = 'https://' + url;
+                }
                 if (url) {
-                  const html = `<a href="${url}">${title}</a>`;
-                  await this.humanSendText(msg.chat.id, html, { parse_mode: 'HTML', disable_web_page_preview: false });
+                  await this.humanSendText(msg.chat.id, text || '🔗', {
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: false,
+                    reply_markup: {
+                      inline_keyboard: [[{ text: title, url }]]
+                    }
+                  });
                 }
               } else if (type === 'image') {
                 const url = String(payload.url || '').trim();

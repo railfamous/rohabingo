@@ -377,27 +377,39 @@ export default function SettingsPage() {
                     )}
 
                     {b.block_type === 'link' && (
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-3">
                         <input
                           className="w-full px-3 py-2 border rounded-lg text-sm"
-                          value={b.payload?.title || ''}
+                          value={b.payload?.text || ''}
                           onChange={(e) => {
                             const copy = [...(welcomeBlocks || [])];
-                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), title: e.target.value } };
+                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), text: e.target.value } };
                             setWelcomeBlocks(copy);
                           }}
-                          placeholder="Button Label"
+                          placeholder="Message Text (Optional)..."
                         />
-                        <input
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
-                          value={b.payload?.url || ''}
-                          onChange={(e) => {
-                            const copy = [...(welcomeBlocks || [])];
-                            copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
-                            setWelcomeBlocks(copy);
-                          }}
-                          placeholder="https://example.com"
-                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                            value={b.payload?.title || ''}
+                            onChange={(e) => {
+                              const copy = [...(welcomeBlocks || [])];
+                              copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), title: e.target.value } };
+                              setWelcomeBlocks(copy);
+                            }}
+                            placeholder="Button Label"
+                          />
+                          <input
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                            value={b.payload?.url || ''}
+                            onChange={(e) => {
+                              const copy = [...(welcomeBlocks || [])];
+                              copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), url: e.target.value } };
+                              setWelcomeBlocks(copy);
+                            }}
+                            placeholder="https://example.com"
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -541,8 +553,13 @@ export default function SettingsPage() {
 
                       {/* Link Block */}
                       {b.block_type === 'link' && b.payload?.title && (
-                        <div className="bg-[#182533] text-blue-400 p-3 rounded-xl max-w-[85%] text-sm text-center font-medium border border-[#0e1621] cursor-pointer hover:bg-[#202b36]">
-                          {b.payload.title} ↗
+                        <div className="flex flex-col max-w-[85%]">
+                          <div className="bg-[#182533] text-white p-3 rounded-t-xl rounded-bl-xl border border-[#0e1621] border-b-0 text-sm whitespace-pre-wrap">
+                            {b.payload.text || '🔗'}
+                          </div>
+                          <div className="bg-[#202b36] text-blue-400 p-2.5 text-sm text-center font-medium border border-[#0e1621] border-t-0 rounded-b-xl cursor-pointer hover:bg-[#2b3947]">
+                            {b.payload.title} ↗
+                          </div>
                         </div>
                       )}
 
