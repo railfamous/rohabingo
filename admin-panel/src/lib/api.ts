@@ -98,6 +98,11 @@ export interface User {
   photo_url: string | null;
   created_at: string;
   last_active: string;
+  is_banned?: boolean;
+  is_premium?: boolean;
+  premium_until?: string | null;
+  points?: number;
+  referral_code?: string;
 }
 
 export interface Pagination {

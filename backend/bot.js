@@ -805,7 +805,7 @@ class TelegramBot {
         'last_name = EXCLUDED.last_name, ' +
         'language_code = EXCLUDED.language_code, ' +
         'last_active = NOW() ' +
-        'RETURNING id, points, referral_code',
+        'RETURNING id, points, referral_code, is_banned',
         [
           userIdNum,
           sender.username || '',
@@ -1227,6 +1227,11 @@ class TelegramBot {
         // Register user in database
         const registrationResult = await this.registerUser(sender);
 
+        if (registrationResult.success && registrationResult.user.is_banned) {
+          logger.info(`[Ban] Ignored /start from banned user ${sender.id}`);
+          return;
+        }
+
         // Determine user's language (DB language_code > Telegram language_code > default_language)
         // NOTE: language is still useful for onboarding question translations.
         const userLang = await this.getUserLanguage(sender.id, sender.language_code);
@@ -1385,6 +1390,12 @@ class TelegramBot {
     this.bot.on('message', async (msg) => {
       try {
         const chatId = msg.chat.id;
+
+        // Check ban status
+        const banCheck = await pool.query('SELECT is_banned FROM telegram_users WHERE id = $1', [Number(msg.from.id)]);
+        if (banCheck.rows[0]?.is_banned) {
+          return;
+        }
 
         // If a flow session exists, route input depending on node type.
         if (this.flow) {
@@ -1762,6 +1773,13 @@ Share this code with your friends and ask them to send /start ref${referralInfo.
       try {
         const data = query.data || '';
         const chatId = query.message.chat.id;
+
+        // Check ban status
+        const banCheck = await pool.query('SELECT is_banned FROM telegram_users WHERE id = $1', [Number(query.from.id)]);
+        if (banCheck.rows[0]?.is_banned) {
+          await this.bot.answerCallbackQuery(query.id, { text: 'You are banned from using this bot.', show_alert: true });
+          return;
+        }
 
         // Flow engine (single_choice)
         if (data.startsWith('flowmulti:')) {

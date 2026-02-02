@@ -58,6 +58,25 @@ export default function UsersPage() {
 
 
 
+  const handleBanToggle = async () => {
+    if (!selectedUser) return;
+    if (!confirm(`Are you sure you want to ${selectedUser.is_banned ? 'unban' : 'ban'} @${selectedUser.username || 'this user'}?`)) return;
+
+    try {
+      await setUserBanned(selectedUser.id, !selectedUser.is_banned);
+      // Update local data
+      const updatedUser = { ...selectedUser, is_banned: !selectedUser.is_banned };
+      setSelectedUser(updatedUser);
+      setUsersData(prev => prev ? ({
+        ...prev,
+        users: prev.users.map(u => u.id === updatedUser.id ? updatedUser : u)
+      }) : null);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update status');
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -128,6 +147,16 @@ export default function UsersPage() {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.id}
+                      {user.is_banned && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+                          Banned
+                        </span>
+                      )}
+                      {user.is_premium && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          Premium
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -294,7 +323,36 @@ export default function UsersPage() {
                 <div className="flex flex-wrap gap-4 mb-2">
                   <div className="text-sm text-gray-700">User Details</div>
                 </div>
-                <div className="text-xs text-gray-500 mb-1">Last Active: {selectedUser.last_active ? formatDistanceToNow(new Date(selectedUser.last_active), { addSuffix: true }) : 'Never'}</div>
+                <div className="text-xs text-gray-500 mb-6">Last Active: {selectedUser.last_active ? formatDistanceToNow(new Date(selectedUser.last_active), { addSuffix: true }) : 'Never'}</div>
+
+                <div className="pt-6 border-t border-gray-100">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Actions</h4>
+                  <button
+                    onClick={handleBanToggle}
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-colors
+                      ${selectedUser.is_banned
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                        : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                      }`}
+                  >
+                    {selectedUser.is_banned ? (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                        Unban User
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" /></svg>
+                        Ban User
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-2 text-[11px] text-center text-gray-400">
+                    {selectedUser.is_banned
+                      ? 'User is explicitly blocked from the bot.'
+                      : 'Banned users cannot use the bot or receive broadcasts.'}
+                  </p>
+                </div>
               </div>
             )}
           </div>
