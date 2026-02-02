@@ -503,12 +503,41 @@ export default function InboxPage() {
                           {m.text}
 
                           {(m.file_id || m.file_name || m.payload?.media_url) && (
-                            <div className="mt-2 flex items-center gap-2 p-2 rounded bg-black/5 border border-black/5">
-                              {m.type === 'photo' ? <ImageIcon className="w-5 h-5 text-purple-500" /> : <FileText className="w-5 h-5 text-blue-500" />}
-                              <div className="flex flex-col overflow-hidden">
-                                <span className="text-xs font-medium truncate w-full">{m.file_name || 'Media Attachment'}</span>
-                                <span className="text-[10px] text-gray-500 uppercase">{m.type || 'FILE'}</span>
-                              </div>
+                            <div className="mt-2">
+                              {/* Media Preview Logic */}
+                              {(function () {
+                                const url = m.payload?.media_url;
+                                if (url && m.type === 'photo') {
+                                  return (
+                                    <div className="rounded-lg overflow-hidden border border-black/5 bg-gray-100 flex justify-center max-w-sm">
+                                      <img src={url} alt="Attachment" className="max-h-[300px] w-auto object-contain cursor-pointer hover:opacity-95" onClick={() => window.open(url, '_blank')} />
+                                    </div>
+                                  );
+                                }
+                                if (url && m.type === 'video') {
+                                  return (
+                                    <div className="rounded-lg overflow-hidden border border-black/5 bg-black max-w-sm">
+                                      <video src={url} controls className="max-h-[300px] w-full" />
+                                    </div>
+                                  );
+                                }
+                                // Fallback for docs or missing URL
+                                return (
+                                  <div className="flex items-center gap-2 p-2 rounded bg-black/5 border border-black/5">
+                                    {m.type === 'photo' ? <ImageIcon className="w-5 h-5 text-purple-500" /> : <FileText className="w-5 h-5 text-blue-500" />}
+                                    <div className="flex flex-col overflow-hidden">
+                                      {url ? (
+                                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium truncate w-full hover:underline text-blue-600">
+                                          {m.file_name || 'Download Attachment'}
+                                        </a>
+                                      ) : (
+                                        <span className="text-xs font-medium truncate w-full">{m.file_name || 'Media Attachment'}</span>
+                                      )}
+                                      <span className="text-[10px] text-gray-500 uppercase">{m.type || 'FILE'}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
