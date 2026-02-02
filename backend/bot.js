@@ -463,10 +463,14 @@ class TelegramBot {
       try {
         const due = await pool.query(
           `SELECT * FROM scheduled_posts
-           WHERE status='pending' AND send_at <= NOW()
+           WHERE status='pending' AND send_at <= (NOW() AT TIME ZONE 'UTC')
            ORDER BY send_at ASC
            LIMIT 20`
         );
+
+        if (due.rows.length > 0) {
+          logger.info(`[Scheduler] Found ${due.rows.length} pending posts`);
+        }
 
         for (const job of due.rows) {
           try {
@@ -478,12 +482,16 @@ class TelegramBot {
               await this.bot.sendMessage(job.chat_id, String(job.text || ''), { parse_mode: 'HTML' });
             }
 
-            await pool.query('UPDATE scheduled_posts SET status=\'sent\', updated_at=NOW() WHERE id=$1', [job.id]);
+            await pool.query('UPDATE scheduled_posts SET status=\'sent\', updated_at=(NOW() AT TIME ZONE \'UTC\') WHERE id=$1', [job.id]);
+            logger.info(`[Scheduler] Sent post ${job.id} to ${job.chat_id}`);
           } catch (e) {
-            await pool.query('UPDATE scheduled_posts SET status=\'failed\', error=$2, updated_at=NOW() WHERE id=$1', [job.id, String(e?.message || e)]);
+            logger.error(`[Scheduler] Failed to send post ${job.id}`, e);
+            await pool.query('UPDATE scheduled_posts SET status=\'failed\', error=$2, updated_at=(NOW() AT TIME ZONE \'UTC\') WHERE id=$1', [job.id, String(e?.message || e)]);
           }
         }
-      } catch { }
+      } catch (e) {
+        logger.error('[Scheduler] Error in loop', e);
+      }
     }, 5000);
   }
 

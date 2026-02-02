@@ -65,6 +65,10 @@ export default function ModerationPage() {
     allowed_patterns: string[];
   }>({ types: ['all'], blocked_patterns: [], allowed_patterns: [] });
 
+  // Raw input state to allow flexible typing (commas, newlines) before parsing on save
+  const [blockedPatternsInput, setBlockedPatternsInput] = useState('');
+  const [allowedPatternsInput, setAllowedPatternsInput] = useState('');
+
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [botChats, setBotChats] = useState<BotChat[]>([]);
 
@@ -77,6 +81,8 @@ export default function ModerationPage() {
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [scheduleAt, setScheduleAt] = useState('');
+
+  const [jobFilter, setJobFilter] = useState<'all' | 'pending' | 'sent' | 'failed'>('all');
 
   const secondsToUi = (secs: number) => {
     const s = Number(secs || 0);
@@ -120,7 +126,10 @@ export default function ModerationPage() {
       }
 
       // Parse delete_links_config (Global)
-      setDeleteLinkConfig(c.delete_links_config || { types: ['all'], blocked_patterns: [], allowed_patterns: [] });
+      const dlc = c.delete_links_config || { types: ['all'], blocked_patterns: [], allowed_patterns: [] };
+      setDeleteLinkConfig(dlc);
+      setBlockedPatternsInput('');
+      setAllowedPatternsInput('');
 
       const [p, chats, perChat] = await Promise.all([getScheduledPosts(), getBotChats(), getModerationSettings()]);
       setPosts(p.posts || []);
@@ -197,6 +206,8 @@ export default function ModerationPage() {
       setAutoMuteDurationUnit(ui.unit);
     }
     setDeleteLinkConfig(s.delete_links_config || { types: ['all'], blocked_patterns: [], allowed_patterns: [] });
+    setBlockedPatternsInput('');
+    setAllowedPatternsInput('');
   }, [modChatDest, modSettingsMap]);
 
   return (
@@ -268,6 +279,47 @@ export default function ModerationPage() {
                                 onCheckedChange={() => { }}
                               />
                               <span>Select All ({botChats.length})</span>
+                            </div>
+                          </CommandItem>
+                          <CommandItem
+                            onSelect={() => {
+                              const groups = botChats.filter(c => c.chat_type === 'group' || c.chat_type === 'supergroup').map(c => `${c.chat_id}:${c.chat_type}`);
+                              const allSelected = groups.every(id => selectedChats.includes(id));
+                              let newChats = [...selectedChats];
+                              if (allSelected) {
+                                newChats = newChats.filter(id => !groups.includes(id));
+                              } else {
+                                // Add missing
+                                groups.forEach(id => {
+                                  if (!newChats.includes(id)) newChats.push(id);
+                                });
+                              }
+                              setSelectedChats(newChats);
+                              if (newChats.length > 0 && !newChats.includes(modChatDest)) setModChatDest(newChats[0]);
+                            }}
+                          >
+                            <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
+                              <span>Select All Groups</span>
+                            </div>
+                          </CommandItem>
+                          <CommandItem
+                            onSelect={() => {
+                              const channels = botChats.filter(c => c.chat_type === 'channel').map(c => `${c.chat_id}:${c.chat_type}`);
+                              const allSelected = channels.every(id => selectedChats.includes(id));
+                              let newChats = [...selectedChats];
+                              if (allSelected) {
+                                newChats = newChats.filter(id => !channels.includes(id));
+                              } else {
+                                channels.forEach(id => {
+                                  if (!newChats.includes(id)) newChats.push(id);
+                                });
+                              }
+                              setSelectedChats(newChats);
+                              if (newChats.length > 0 && !newChats.includes(modChatDest)) setModChatDest(newChats[0]);
+                            }}
+                          >
+                            <div className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
+                              <span>Select All Channels</span>
                             </div>
                           </CommandItem>
                           {botChats.map((chat) => {
@@ -352,6 +404,17 @@ export default function ModerationPage() {
                     placeholder="Welcome <b>{name}</b> to our group!"
                     className="font-mono text-sm"
                   />
+                  <div className="mt-2 p-3 bg-slate-50 border rounded-md text-sm">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Preview</p>
+                    <div
+                      className="prose prose-sm max-w-none text-slate-800"
+                      dangerouslySetInnerHTML={{
+                        __html: (welcomeText || 'Welcome <b>{name}</b> to our group!')
+                          .replace(/{name}|{new_member}|{new_members}/g, '<span class="text-blue-600 font-medium">@JohnDoe</span>')
+                          .replace(/\n/g, '<br/>')
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -415,38 +478,119 @@ export default function ModerationPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Blocked Patterns (Regex/String, one per line)</Label>
-                    <Textarea
-                      placeholder="example\.com&#10;badword"
-                      className="h-20 text-xs font-mono"
-                      value={deleteLinkConfig.blocked_patterns.join('\n')}
-                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, blocked_patterns: e.target.value.split(/[\n,]+/).map(x => x.trim()).filter(x => x) }))}
-                    />
+                    <Label className="text-xs">Blocked Patterns (Regex/String)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="example\.com"
+                        className="text-xs font-mono"
+                        value={blockedPatternsInput}
+                        onChange={(e) => setBlockedPatternsInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (blockedPatternsInput.trim()) {
+                              setDeleteLinkConfig(prev => ({
+                                ...prev,
+                                blocked_patterns: [...prev.blocked_patterns, blockedPatternsInput.trim()]
+                              }));
+                              setBlockedPatternsInput('');
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          if (blockedPatternsInput.trim()) {
+                            setDeleteLinkConfig(prev => ({
+                              ...prev,
+                              blocked_patterns: [...prev.blocked_patterns, blockedPatternsInput.trim()]
+                            }));
+                            setBlockedPatternsInput('');
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
                     {deleteLinkConfig.blocked_patterns.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {deleteLinkConfig.blocked_patterns.map((p, i) => (
                           <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 text-[10px] rounded border border-red-100">
                             <Shield className="w-3 h-3" />
                             {p}
+                            <button
+                              className="ml-1 hover:text-red-900"
+                              onClick={() => {
+                                setDeleteLinkConfig(prev => ({
+                                  ...prev,
+                                  blocked_patterns: prev.blocked_patterns.filter((_, idx) => idx !== i)
+                                }));
+                              }}
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
+
                   <div className="space-y-2">
-                    <Label className="text-xs">Allowed Patterns (Whitelist, one per line or comma-separated)</Label>
-                    <Textarea
-                      placeholder="google\.com, goodsite"
-                      className="h-20 text-xs font-mono"
-                      value={deleteLinkConfig.allowed_patterns.join('\n')}
-                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, allowed_patterns: e.target.value.split(/[\n,]+/).map(x => x.trim()).filter(x => x) }))}
-                    />
+                    <Label className="text-xs">Allowed Patterns (Whitelist)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="google\.com"
+                        className="text-xs font-mono"
+                        value={allowedPatternsInput}
+                        onChange={(e) => setAllowedPatternsInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (allowedPatternsInput.trim()) {
+                              setDeleteLinkConfig(prev => ({
+                                ...prev,
+                                allowed_patterns: [...prev.allowed_patterns, allowedPatternsInput.trim()]
+                              }));
+                              setAllowedPatternsInput('');
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          if (allowedPatternsInput.trim()) {
+                            setDeleteLinkConfig(prev => ({
+                              ...prev,
+                              allowed_patterns: [...prev.allowed_patterns, allowedPatternsInput.trim()]
+                            }));
+                            setAllowedPatternsInput('');
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
                     {deleteLinkConfig.allowed_patterns.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {deleteLinkConfig.allowed_patterns.map((p, i) => (
                           <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-[10px] rounded border border-green-100">
                             <CheckCircle2 className="w-3 h-3" />
                             {p}
+                            <button
+                              className="ml-1 hover:text-green-900"
+                              onClick={() => {
+                                setDeleteLinkConfig(prev => ({
+                                  ...prev,
+                                  allowed_patterns: prev.allowed_patterns.filter((_, idx) => idx !== i)
+                                }));
+                              }}
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>
@@ -668,35 +812,61 @@ export default function ModerationPage() {
 
           {/* Jobs List */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-medium text-gray-700">Scheduled Jobs</CardTitle>
+              <div className="w-[140px]">
+                <Select value={jobFilter} onValueChange={(v: any) => setJobFilter(v)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              {posts.length === 0 ? (
-                <div className="text-sm text-muted-foreground text-center py-4">No pending posts</div>
+              {posts.filter(p => jobFilter === 'all' || p.status === jobFilter).length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  {posts.length === 0 ? 'No posts yet' : `No ${jobFilter} posts`}
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {posts.map(p => (
-                    <div key={p.id} className="flex items-start justify-between p-3 border rounded-lg bg-gray-50/50">
-                      <div className="space-y-1">
-                        <div className="text-xs font-semibold text-gray-700">
-                          To: {p.chat_id}
-                          <span className="ml-1 px-1.5 py-0.5 bg-gray-200 rounded text-[10px] text-gray-600">{p.chat_type}</span>
+                  {posts
+                    .filter(p => jobFilter === 'all' || p.status === jobFilter)
+                    .map(p => (
+                      <div key={p.id} className="flex items-start justify-between p-3 border rounded-lg bg-gray-50/50">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="text-xs font-semibold text-gray-700">TO: {p.chat_id}</div>
+                            <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium uppercase tracking-wide
+                            ${p.status === 'sent' ? 'bg-green-100 text-green-700 border-green-200' :
+                                p.status === 'failed' ? 'bg-red-100 text-red-700 border-red-200' :
+                                  'bg-yellow-100 text-yellow-800 border-yellow-200'}`}
+                            >
+                              {p.status}
+                            </span>
+                          </div>
+                          <div className="text-xs font-semibold text-gray-700">
+                            <span className="px-1.5 py-0.5 bg-gray-200 rounded text-[10px] text-gray-600">{p.chat_type}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {format(new Date(p.send_at), 'MMM d, h:mm a')}
+                          </div>
+                          {p.error && <div className="text-xs text-red-500 mt-1">Error: {p.error}</div>}
                         </div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {format(new Date(p.send_at), 'MMM d, h:mm a')}
-                        </div>
-                        {p.error && <div className="text-xs text-red-500 mt-1">Error: {p.error}</div>}
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={async () => {
+                          await deleteScheduledPost(p.id);
+                          load();
+                        }}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={async () => {
-                        await deleteScheduledPost(p.id);
-                        load();
-                      }}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </CardContent>
