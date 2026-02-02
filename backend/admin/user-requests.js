@@ -107,7 +107,6 @@ router.post('/:id/reply', adminAuth, async (req, res) => {
        SET admin_reply = $1,
            replied_by_admin_id = $2,
            replied_at = NOW(),
-           status = 'closed',
            updated_at = NOW()
        WHERE id = $3
        RETURNING *`,

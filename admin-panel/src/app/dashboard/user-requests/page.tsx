@@ -80,8 +80,12 @@ export default function UserRequestsPage() {
       if (statusFilter !== 'all') params.status = statusFilter;
       const res = await api.get('/admin/user-requests', { params });
       setItems(res.data.requests || []);
-      // Maintain selection if exists and still in list
-      setSelected(prev => (prev ? (res.data.requests || []).find((r: UserRequest) => r.id === prev.id) || null : null));
+      // Maintain selection even if it disappears from the list (e.g. status change)
+      setSelected(prev => {
+        if (!prev) return null;
+        const found = (res.data.requests || []).find((r: UserRequest) => r.id === prev.id);
+        return found || prev;
+      });
     } catch (e) {
       toast.error('Failed to load requests');
     } finally {
@@ -107,6 +111,11 @@ export default function UserRequestsPage() {
 
   const updateStatus = async (id: number, status: 'open' | 'in_progress' | 'closed') => {
     try {
+      // Optimistic update for selected item
+      if (selected && selected.id === id) {
+        setSelected({ ...selected, status });
+      }
+
       await api.patch(`/admin/user-requests/${id}/status`, { status });
       toast.success(`Status updated to ${status}`);
       await fetchData();
@@ -372,16 +381,18 @@ export default function UserRequestsPage() {
                 <p className="text-[10px] text-gray-400">
                   Press Enter to send • Shift+Enter for new line
                 </p>
-                {selected.status !== 'closed' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => updateStatus(selected.id, 'closed')}
-                    className="text-xs h-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                  >
-                    Close Ticket
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {selected.status !== 'closed' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateStatus(selected.id, 'closed')}
+                      className="text-xs h-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    >
+                      Close Ticket
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </>

@@ -341,37 +341,44 @@ export default function InboxPage() {
         <ScrollArea className="flex-1">
           <div className="flex flex-col">
             {filteredConversations.map((c) => {
-              const name = c.username
-                ? `@${c.username}`
-                : [c.first_name, c.last_name].filter(Boolean).join(' ') || `User ${c.telegram_chat_id}`;
-              const initials = (name.slice(0, 2)).toUpperCase();
+              const displayName = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unknown User';
+              const username = c.username ? `@${c.username}` : '';
+              const userId = `ID: ${c.telegram_chat_id}`;
+              const initials = (displayName.slice(0, 2)).toUpperCase();
 
               return (
                 <button
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
-                  className={`flex items-start gap-3 p-4 text-left transition-colors border-b border-dashed border-gray-100 last:border-0 hover:bg-gray-50/80
-                    ${selectedId === c.id ? 'bg-blue-50/50 hover:bg-blue-50' : ''}`}
+                  className={`flex items-start gap-3 p-3 text-left transition-all border-b border-gray-100 last:border-0 hover:bg-gray-50
+                    ${selectedId === c.id ? 'bg-blue-50/60 border-l-4 border-l-blue-500 pl-[11px]' : 'pl-4 border-l-4 border-l-transparent'}`}
                 >
-                  <Avatar className="h-10 w-10 border relative">
-                    {c.photo_url && <AvatarImage src={c.photo_url} alt={name} />}
-                    <AvatarFallback className="text-xs bg-blue-100 text-blue-700">{initials}</AvatarFallback>
+                  <Avatar className="h-10 w-10 border shrink-0">
+                    {c.photo_url && <AvatarImage src={c.photo_url} alt={displayName} />}
+                    <AvatarFallback className="text-xs bg-gray-100 text-gray-600 font-medium">{initials}</AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`font-medium text-sm truncate ${selectedId === c.id ? 'text-blue-900' : 'text-gray-900'}`}>
-                        {name}
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className={`font-semibold text-sm truncate ${selectedId === c.id ? 'text-gray-900' : 'text-gray-800'}`}>
+                        {displayName}
                       </span>
-                      <span className="text-[10px] text-gray-400 shrink-0 ml-2">
-                        {c.last_message_at ? format(new Date(c.last_message_at), 'MMM d') : ''}
+                      <span className="text-[10px] text-gray-400 shrink-0 ml-1">
+                        {c.last_message_at ? format(new Date(c.last_message_at), 'HH:mm') : ''}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <p className={`text-xs truncate max-w-[180px] ${selectedId === c.id ? 'text-blue-600/80' : 'text-gray-500'}`}>
+
+                    <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-1">
+                      {username && <span className="font-mono text-blue-600/80">{username}</span>}
+                      {username && <span className="text-gray-300">•</span>}
+                      <span className="font-mono text-gray-400">{userId}</span>
+                    </div>
+
+                    <div className="flex justify-between items-end gap-2">
+                      <p className={`text-xs truncate ${selectedId === c.id ? 'text-gray-600' : 'text-gray-500'}`}>
                         {c.last_message_preview || 'No messages'}
                       </p>
                       {c.unread_count > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full font-bold shadow-sm">
+                        <span className="bg-green-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center rounded-full font-bold shadow-sm shrink-0">
                           {c.unread_count}
                         </span>
                       )}
@@ -391,45 +398,65 @@ export default function InboxPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50/30">
+      <div className="flex-1 flex flex-col bg-[#efe7dd] relative">
+        {/* Background Pattern Overlay (Optional, simple dot/noise for texture) */}
+        <div className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }} />
+
         {selectedConversation ? (
           <>
             {/* Header */}
-            <div className="h-16 border-b bg-white flex items-center justify-between px-6 shrink-0">
+            <div className="h-16 border-b bg-gray-50/95 backdrop-blur supports-[backdrop-filter]:bg-gray-50/60 flex items-center justify-between px-4 shrink-0 z-10 sticky top-0">
               <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9 border">
+                <Avatar className="h-10 w-10 border cursor-pointer hover:opacity-90 transition-opacity">
                   {selectedConversation.photo_url && <AvatarImage src={selectedConversation.photo_url} alt={selectedConversation.username || 'User'} />}
-                  <AvatarFallback className="bg-purple-100 text-purple-700">
+                  <AvatarFallback className="bg-gray-200 text-gray-500 font-semibold">
                     {selectedConversation.username?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    {selectedConversation.username ? `@${selectedConversation.username}` : `User ${selectedConversation.telegram_chat_id}`}
+                  <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    {[selectedConversation.first_name, selectedConversation.last_name].filter(Boolean).join(' ') || 'Unknown User'}
+                    {selectedConversation.username && <span className="text-gray-500 font-normal">(@{selectedConversation.username})</span>}
                   </h2>
-                  <div className="text-xs text-green-600 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    Active
+                  <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                    <span className="bg-blue-100 text-blue-700 font-mono px-1 rounded">ID: {selectedConversation.telegram_chat_id}</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-green-600 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Online
+                    </span>
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="text-gray-400">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* Actions */}
+                <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100">
+                  <Search className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100">
+                  <MoreVertical className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 min-h-0">
-              <div className="space-y-4 max-w-3xl mx-auto pb-4">
+            <div className="flex-1 overflow-y-auto p-4 min-h-0 z-0">
+              <div className="space-y-2 max-w-4xl mx-auto pb-4">
                 {loading && (
                   <div className="flex justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
                   </div>
                 )}
 
                 {messages.length === 0 && !loading && (
-                  <div className="text-center py-10 text-sm text-gray-400">
-                    No messages in this conversation yet.
+                  <div className="text-center py-10">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
+                      <span className="text-2xl">👋</span>
+                    </div>
+                    <p className="text-sm text-gray-500 bg-white/80 px-4 py-1 rounded-full inline-block shadow-sm">
+                      No messages yet. Say hello!
+                    </p>
                   </div>
                 )}
 
@@ -439,59 +466,53 @@ export default function InboxPage() {
                     <div
                       key={m.id}
                       id={m.telegram_message_id ? `msg-${m.telegram_message_id}` : undefined}
-                      className="group relative"
+                      className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} group mb-1`}
                     >
-                      <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-                        <div className="flex items-end gap-2 max-w-[85%]">
-                          {/* Reply Button (visible on hover) */}
-                          <button
-                            onClick={() => setReplyTo(m)}
-                            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-gray-200 text-gray-400
-                              ${isOutbound ? 'order-first mr-1' : 'order-last ml-1'}`}
-                            title="Reply"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-reply"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
-                          </button>
+                      <div className={`relative max-w-[85%] lg:max-w-[70%] min-w-[120px] shadow-sm
+                        ${isOutbound
+                          ? 'bg-[#d9fdd3] rounded-l-lg rounded-tr-none rounded-br-lg'
+                          : 'bg-white rounded-r-lg rounded-tl-none rounded-bl-lg'
+                        } p-1.5 pb-1`
+                      }>
+                        {/* Tail Trick (Optional SVG or CSS border hack, keeping simple rounded for now) */}
 
-                          <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm border transition-all duration-500
-                            ${highlightedId === m.telegram_message_id
-                              ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-100'
-                              : (isOutbound
-                                ? 'bg-blue-600 text-white border-blue-600 rounded-br-none'
-                                : 'bg-white text-gray-800 border-gray-200 rounded-bl-none'
-                              )
-                            }
-                          `}>
-                            {/* Reply Context in Message Bubble */}
-                            {m.telegram_reply_to_message_id && (
-                              <div
-                                onClick={() => m.telegram_reply_to_message_id && scrollToMessage(m.telegram_reply_to_message_id)}
-                                className={`mb-2 pl-2 border-l-2 text-xs opacity-75 cursor-pointer hover:opacity-100 transition-opacity
-                                  ${isOutbound ? 'border-white/50' : 'border-blue-500'}`}
-                              >
-                                <div className="font-semibold flex items-center gap-1">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
-                                  Reply
-                                </div>
-                              </div>
-                            )}
-
-                            {m.text && <div className="leading-relaxed whitespace-pre-wrap break-words">{m.text}</div>}
-
-                            {(m.file_id || m.file_name || m.payload?.media_url) && (
-                              <div className={`mt-2 p-2 rounded bg-black/10 flex items-center gap-2 text-xs font-medium`}>
-                                {m.type === 'photo' ? <ImageIcon className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                                <span className="truncate max-w-[150px]">
-                                  {m.file_name || m.file_unique_id || 'Attachment'}
-                                </span>
-                              </div>
-                            )}
-
-                            <div className={`text-[10px] mt-1 text-right opacity-70 flex items-center justify-end gap-1`}>
-                              {format(new Date(m.created_at), 'h:mm a')}
-                              {isOutbound && <CheckCheck className="w-3 h-3" />}
+                        <div className="px-2 pt-1 pb-4 text-[14.2px] text-gray-900 leading-snug whitespace-pre-wrap break-words">
+                          {/* Reply Context */}
+                          {m.telegram_reply_to_message_id && (
+                            <div
+                              onClick={() => m.telegram_reply_to_message_id && scrollToMessage(m.telegram_reply_to_message_id)}
+                              className={`mb-1 pl-2 border-l-4 rounded bg-black/5 text-xs py-1.5 cursor-pointer hover:bg-black/10 transition-colors
+                                ${isOutbound ? 'border-green-500' : 'border-blue-500'}`}
+                            >
+                              <div className="font-semibold text-blue-600/80 mb-0.5">Reply</div>
+                              <div className="truncate opacity-70">Click to view original</div>
                             </div>
-                          </div>
+                          )}
+
+                          {m.text}
+
+                          {(m.file_id || m.file_name || m.payload?.media_url) && (
+                            <div className="mt-2 flex items-center gap-2 p-2 rounded bg-black/5 border border-black/5">
+                              {m.type === 'photo' ? <ImageIcon className="w-5 h-5 text-purple-500" /> : <FileText className="w-5 h-5 text-blue-500" />}
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-xs font-medium truncate w-full">{m.file_name || 'Media Attachment'}</span>
+                                <span className="text-[10px] text-gray-500 uppercase">{m.type || 'FILE'}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Timestamp & Status */}
+                        <div className="absolute right-2 bottom-1 flex items-center gap-1 space-x-0.5 select-none">
+                          <span className="text-[11px] text-gray-500/80 min-w-[45px] text-right">
+                            {format(new Date(m.created_at), 'h:mm a')}
+                          </span>
+                          {isOutbound && (
+                            <div className="flex">
+                              {/* Double Tick (Blue if read, Gray if sent) - Mocking blue for now as "delivered" */}
+                              <CheckCheck className="w-4 h-4 text-blue-500" />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
