@@ -249,7 +249,7 @@ export default function InboxPage() {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setHighlightedId(telegramId);
-      setTimeout(() => setHighlightedId(null), 2000);
+      setTimeout(() => setHighlightedId(null), 3000);
     } else {
       toast.error('Message not found (might be too old)');
     }
@@ -466,9 +466,20 @@ export default function InboxPage() {
                     <div
                       key={m.id}
                       id={m.telegram_message_id ? `msg-${m.telegram_message_id}` : undefined}
-                      className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} group mb-1`}
+                      className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} group mb-1 items-end gap-2`}
                     >
-                      <div className={`relative max-w-[85%] lg:max-w-[70%] min-w-[120px] shadow-sm
+                      {isOutbound && (
+                        <button
+                          onClick={() => setReplyTo(m)}
+                          className="mb-2 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full hover:bg-gray-200 text-gray-400"
+                          title="Reply"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+                        </button>
+                      )}
+
+                      <div className={`relative max-w-[85%] lg:max-w-[70%] min-w-[120px] shadow-sm transition-all duration-300
+                        ${highlightedId === m.telegram_message_id ? 'ring-4 ring-blue-400/50 bg-blue-50 z-10 scale-105 shadow-lg' : ''}
                         ${isOutbound
                           ? 'bg-[#d9fdd3] rounded-l-lg rounded-tr-none rounded-br-lg'
                           : 'bg-white rounded-r-lg rounded-tl-none rounded-bl-lg'
@@ -515,6 +526,16 @@ export default function InboxPage() {
                           )}
                         </div>
                       </div>
+
+                      {!isOutbound && (
+                        <button
+                          onClick={() => setReplyTo(m)}
+                          className="mb-2 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full hover:bg-gray-200 text-gray-400"
+                          title="Reply"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+                        </button>
+                      )}
                     </div>
                   );
                 })}
