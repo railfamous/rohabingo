@@ -420,17 +420,37 @@ export default function ModerationPage() {
                       placeholder="example\.com&#10;badword"
                       className="h-20 text-xs font-mono"
                       value={deleteLinkConfig.blocked_patterns.join('\n')}
-                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, blocked_patterns: e.target.value.split('\n').filter(x => x.trim()) }))}
+                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, blocked_patterns: e.target.value.split(/[\n,]+/).map(x => x.trim()).filter(x => x) }))}
                     />
+                    {deleteLinkConfig.blocked_patterns.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {deleteLinkConfig.blocked_patterns.map((p, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 text-[10px] rounded border border-red-100">
+                            <Shield className="w-3 h-3" />
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Allowed Patterns (Whitelist, one per line)</Label>
+                    <Label className="text-xs">Allowed Patterns (Whitelist, one per line or comma-separated)</Label>
                     <Textarea
-                      placeholder="google\.com&#10;goodsite"
+                      placeholder="google\.com, goodsite"
                       className="h-20 text-xs font-mono"
                       value={deleteLinkConfig.allowed_patterns.join('\n')}
-                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, allowed_patterns: e.target.value.split('\n').filter(x => x.trim()) }))}
+                      onChange={(e) => setDeleteLinkConfig(prev => ({ ...prev, allowed_patterns: e.target.value.split(/[\n,]+/).map(x => x.trim()).filter(x => x) }))}
                     />
+                    {deleteLinkConfig.allowed_patterns.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {deleteLinkConfig.allowed_patterns.map((p, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-[10px] rounded border border-green-100">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

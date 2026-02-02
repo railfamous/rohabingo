@@ -13,10 +13,17 @@ router.get('/global', adminAuth, async (req, res) => {
       'moderation_welcome_text',
       'moderation_delete_links_enabled',
       'moderation_auto_mute_enabled',
-      'moderation_auto_mute_seconds'
+      'moderation_auto_mute_seconds',
+      'moderation_delete_links_config'
     ];
     const r = await pool.query('SELECT key, value FROM settings WHERE key = ANY($1::text[])', [keys]);
     const map = new Map(r.rows.map((x) => [x.key, String(x.value)]));
+
+    let deleteLinkConfig = { types: ['all'], blocked_patterns: [], allowed_patterns: [] };
+    try {
+      const raw = map.get('moderation_delete_links_config');
+      if (raw) deleteLinkConfig = JSON.parse(raw);
+    } catch (e) { }
 
     res.json({
       config: {
@@ -25,7 +32,8 @@ router.get('/global', adminAuth, async (req, res) => {
         welcome_text: map.get('moderation_welcome_text') || '',
         delete_links_enabled: map.get('moderation_delete_links_enabled') === 'true',
         auto_mute_enabled: map.get('moderation_auto_mute_enabled') === 'true',
-        auto_mute_seconds: Number(map.get('moderation_auto_mute_seconds') || 3600)
+        auto_mute_seconds: Number(map.get('moderation_auto_mute_seconds') || 3600),
+        delete_links_config: deleteLinkConfig
       }
     });
   } catch (e) {
@@ -43,6 +51,7 @@ router.put('/global', adminAuth, async (req, res) => {
       ['moderation_delete_links_enabled', body.delete_links_enabled ? 'true' : 'false'],
       ['moderation_auto_mute_enabled', body.auto_mute_enabled ? 'true' : 'false'],
       ['moderation_auto_mute_seconds', String(body.auto_mute_seconds || 3600)],
+      ['moderation_delete_links_config', JSON.stringify(body.delete_links_config || {})],
     ];
 
     for (const [key, value] of pairs) {
@@ -258,8 +267,9 @@ router.post('/settings/bulk', adminAuth, async (req, res) => {
             welcome_enabled, welcome_text,
             delete_links_enabled,
             auto_mute_enabled, auto_mute_seconds,
+            delete_links_config,
             updated_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
           ON CONFLICT (chat_id) DO UPDATE SET
             chat_type=EXCLUDED.chat_type,
             enabled=EXCLUDED.enabled,
@@ -268,6 +278,7 @@ router.post('/settings/bulk', adminAuth, async (req, res) => {
             delete_links_enabled=EXCLUDED.delete_links_enabled,
             auto_mute_enabled=EXCLUDED.auto_mute_enabled,
             auto_mute_seconds=EXCLUDED.auto_mute_seconds,
+            delete_links_config=EXCLUDED.delete_links_config,
             updated_at=NOW()`,
           [
             chatId,
@@ -278,6 +289,7 @@ router.post('/settings/bulk', adminAuth, async (req, res) => {
             !!delete_links_enabled,
             !!auto_mute_enabled,
             Number(auto_mute_seconds || 3600),
+            settings.delete_links_config || null
           ]
         );
       }
