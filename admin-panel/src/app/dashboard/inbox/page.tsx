@@ -78,7 +78,8 @@ export default function InboxPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const selectedIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -165,21 +166,58 @@ export default function InboxPage() {
   const prevMetricsRef = useRef({ selectedId: null as number | null, length: 0 });
 
   useEffect(() => {
-    if (!messagesEndRef.current) return;
+    if (!scrollAreaRef.current) return;
 
     const { selectedId: prevId, length: prevLen } = prevMetricsRef.current;
 
-    // Case 1: Changed conversation or first load
-    if (selectedId !== prevId) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-    }
-    // Case 2: New messages arrived (and not explicitly highlighting an old one)
-    else if (messages.length > prevLen && !highlightedId) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    // Determine scenario
+    const isNewSelection = selectedId !== prevId;
+    // Messages loaded (length changed from 0 or small to N, and we just selected)
+    // Actually, simply: if selection changed, we want to jump. 
+    // BUT messages might not be loaded yet (messages=[] initially).
+    // so we wait for messages to populate.
+
+    const isMessagesLoaded = messages.length > 0 && (isNewSelection || messages.length !== prevLen);
+
+    if (isMessagesLoaded) {
+      // 1. If it's a new selection (or first load of messages for this selection), handle positioning
+      // We rely on "isNewSelection" or "We haven't positioned yet".
+      // Let's use a simple heuristic: If we are at the top (scrollTop=0) or we just selected.
+
+      if (isNewSelection || prevLen === 0) {
+        const unread = selectedConversation?.unread_count || 0;
+
+        let targetElement: Element | null = null;
+
+        if (unread > 0 && messages.length >= unread) {
+          const firstUnreadIndex = messages.length - unread;
+          // Try to find by index
+          const container = scrollAreaRef.current.firstElementChild;
+          if (container && container.children[firstUnreadIndex]) {
+            targetElement = container.children[firstUnreadIndex];
+          }
+        }
+
+        if (targetElement) {
+          targetElement.scrollIntoView({ block: 'center', behavior: 'auto' });
+        } else {
+          // Default to bottom
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }
+      // 2. New message arriving in existing active chat
+      else if (messages.length > prevLen && !highlightedId && prevLen > 0) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+
+        if (isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
     }
 
     prevMetricsRef.current = { selectedId, length: messages.length };
-  }, [messages, selectedId, highlightedId]);
+  }, [messages, selectedId, highlightedId, selectedConversation]);
 
   const handleUpload = async (file: File) => {
     try {
@@ -441,7 +479,7 @@ export default function InboxPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 min-h-0 z-0">
+            <div ref={scrollAreaRef} className="flex-1 overflow-y-auto p-4 min-h-0 z-0">
               <div className="space-y-2 max-w-4xl mx-auto pb-4">
                 {loading && (
                   <div className="flex justify-center py-4">
