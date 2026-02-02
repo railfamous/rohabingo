@@ -517,12 +517,12 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Message Area */}
-                <div className="space-y-4 pt-2 pb-20 px-1 overflow-auto h-[500px] scrollbar-hide bg-[#0e1621] -mx-1">
-                  <div className="text-center text-xs text-gray-500 my-4 bg-[#182533] inline-block px-3 py-1 rounded-full mx-auto">Today</div>
+                <div className="space-y-4 pt-2 pb-20 px-1 overflow-auto h-[500px] scrollbar-hide bg-[#0e1621] -mx-1 antialiased">
+                  <div className="text-center !text-white opacity-100 text-xs text-gray-500 my-4 bg-[#182533] inline-block px-3 py-1 rounded-full mx-auto">Today</div>
 
                   {/* Start Command */}
                   <div className="flex justify-end pr-2">
-                    <div className="bg-[#2b5278] text-white p-2 rounded-l-xl rounded-tr-xl rounded-br-none max-w-[80%] text-sm">
+                    <div className="bg-[#2b5278] !text-white opacity-100 p-2 rounded-l-xl rounded-tr-xl rounded-br-none max-w-[80%] text-sm antialiased">
                       /start
                     </div>
                   </div>
@@ -539,14 +539,14 @@ export default function SettingsPage() {
                               : <span>Media Preview</span>}
                           </div>
                           {b.payload.caption && (
-                            <div className="px-2 pb-1 text-sm text-white whitespace-pre-wrap">{b.payload.caption}</div>
+                            <div className="px-2 pb-1 text-sm !text-white opacity-100 whitespace-pre-wrap antialiased">{b.payload.caption}</div>
                           )}
                         </div>
                       ) : null}
 
                       {/* Text Block */}
                       {b.block_type === 'text' && b.payload?.text && (
-                        <div className="bg-[#182533] text-white p-3 rounded-r-xl rounded-tl-xl rounded-bl-none max-w-[85%] text-sm whitespace-pre-wrap">
+                        <div className="bg-[#182533] !text-white opacity-100 p-3 rounded-r-xl rounded-tl-xl rounded-bl-none max-w-[85%] text-sm whitespace-pre-wrap">
                           {b.payload.text}
                         </div>
                       )}
@@ -554,10 +554,10 @@ export default function SettingsPage() {
                       {/* Link Block */}
                       {b.block_type === 'link' && b.payload?.title && (
                         <div className="flex flex-col max-w-[85%]">
-                          <div className="bg-[#182533] text-white p-3 rounded-t-xl rounded-bl-xl border border-[#0e1621] border-b-0 text-sm whitespace-pre-wrap">
+                          <div className="bg-[#182533] !text-white opacity-100 p-3 rounded-t-xl rounded-bl-xl border border-[#0e1621] border-b-0 text-sm whitespace-pre-wrap antialiased">
                             {b.payload.text || '🔗'}
                           </div>
-                          <div className="bg-[#202b36] text-blue-400 p-2.5 text-sm text-center font-medium border border-[#0e1621] border-t-0 rounded-b-xl cursor-pointer hover:bg-[#2b3947]">
+                          <div className="bg-[#202b36] !text-blue-400 opacity-100 p-2.5 text-sm text-center font-semibold border border-[#0e1621] border-t-0 rounded-b-xl cursor-pointer hover:bg-[#2b3947] antialiased">
                             {b.payload.title} ↗
                           </div>
                         </div>
@@ -565,7 +565,7 @@ export default function SettingsPage() {
 
                       {/* Flow Block */}
                       {b.block_type === 'question_flow' && b.payload?.slug && (
-                        <div className="bg-purple-500/20 text-purple-300 p-2 rounded-xl max-w-[85%] text-xs border border-purple-500/30 flex items-center gap-2">
+                        <div className="bg-purple-500/20 !text-purple-300 opacity-100 p-2 rounded-xl max-w-[85%] text-xs border border-purple-500/30 flex items-center gap-2 antialiased">
                           <Workflow className="w-3 h-3" />
                           <span>Triggers: <b>{flows.find(f => f.slug === b.payload.slug)?.title || b.payload.slug}</b></span>
                         </div>
