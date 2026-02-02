@@ -137,11 +137,12 @@ export default function ModerationPage() {
         // Check URL params first
         const chatsParam = searchParams?.get('chats');
         if (chatsParam) {
-          const chatIds = chatsParam.split(',').map(s => Number(s));
+          const chatIds = chatsParam.split(',');
           const validSelections: string[] = [];
 
           chatIds.forEach(id => {
-            const c = filteredChats.find(x => x.chat_id === id);
+            // Compare as strings to handle potential type mismatches (API might return string for BigInt)
+            const c = filteredChats.find(x => String(x.chat_id) === String(id));
             if (c) validSelections.push(`${c.chat_id}:${c.chat_type}`);
           });
 
