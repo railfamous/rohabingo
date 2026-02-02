@@ -361,9 +361,12 @@ class TelegramBot {
           }
 
           if (containsLink && msg.message_id) {
+            logger.info(`[Moderation] Deleting link in ${chatId} (msg_id ${msg.message_id})`);
             try {
               await this.bot.deleteMessage(chatId, msg.message_id);
-            } catch { }
+            } catch (err) {
+              logger.error(`[Moderation] Failed to delete message in ${chatId}:`, err.message);
+            }
 
             // Auto-mute: Only valid for groups where we can restrict members.
             // In channels, the poster is the channel itself or an admin, so we usually can't "restrict" them in the same way.
@@ -372,6 +375,7 @@ class TelegramBot {
               const seconds = Math.max(30, secondsRaw);
               try {
                 const untilDate = Math.floor(Date.now() / 1000) + seconds;
+                logger.info(`[Moderation] Muting user ${msg.from.id} in ${chatId} for ${seconds}s`);
                 await this.bot.restrictChatMember(chatId, msg.from.id, {
                   permissions: {
                     can_send_messages: false,
@@ -385,11 +389,15 @@ class TelegramBot {
                   },
                   until_date: untilDate
                 });
-              } catch { }
+              } catch (err) {
+                logger.error(`[Moderation] Failed to mute user ${msg.from.id} in ${chatId}:`, err.message);
+              }
             }
           }
         }
-      } catch { } // Error handler per-message
+      } catch (err) {
+        logger.error('[handleChatActivity] Top-level error:', err);
+      }
     };
 
     // Listen to standard group messages

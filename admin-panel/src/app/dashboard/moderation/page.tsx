@@ -496,10 +496,13 @@ export default function ModerationPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Blocked Patterns (Regex/String)</Label>
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs">Blocked Regex Patterns</Label>
+                      <span className="text-[10px] text-muted-foreground">Type & Press Enter to add</span>
+                    </div>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="example\.com"
+                        placeholder="e.g. badword|spam\.com"
                         className="text-xs font-mono"
                         value={blockedPatternsInput}
                         onChange={(e) => setBlockedPatternsInput(e.target.value)}
@@ -556,10 +559,13 @@ export default function ModerationPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Allowed Patterns (Whitelist)</Label>
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs">Allowed Patterns (Whitelist)</Label>
+                      <span className="text-[10px] text-muted-foreground">Exempt from deletion</span>
+                    </div>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="google\.com"
+                        placeholder="e.g. google\.com"
                         className="text-xs font-mono"
                         value={allowedPatternsInput}
                         onChange={(e) => setAllowedPatternsInput(e.target.value)}
