@@ -145,12 +145,22 @@ export default function ModerationPage() {
 
         // Check URL params first
         const chatsParam = searchParams?.get('chats');
-        if (chatsParam) {
-          const chatIds = chatsParam.split(',');
-          const validSelections: string[] = [];
+        let initialIds: string[] = [];
 
-          chatIds.forEach(id => {
-            // Compare as strings to handle potential type mismatches (API might return string for BigInt)
+        if (chatsParam) {
+          initialIds = chatsParam.split(',');
+        } else {
+          // Fallback to localStorage
+          try {
+            const saved = localStorage.getItem('botdash_selected_chats');
+            if (saved) initialIds = JSON.parse(saved);
+          } catch { }
+        }
+
+        if (initialIds.length > 0) {
+          const validSelections: string[] = [];
+          initialIds.forEach(id => {
+            // Compare as strings to handle potential type mismatches
             const c = filteredChats.find(x => String(x.chat_id) === String(id));
             if (c) validSelections.push(`${c.chat_id}:${c.chat_type}`);
           });
@@ -179,6 +189,14 @@ export default function ModerationPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist selection
+  useEffect(() => {
+    if (selectedChats.length > 0) {
+      const ids = selectedChats.map(s => s.split(':')[0]);
+      localStorage.setItem('botdash_selected_chats', JSON.stringify(ids));
+    }
+  }, [selectedChats]);
 
   useEffect(() => {
     if (!modChatDest) return;
@@ -857,6 +875,17 @@ export default function ModerationPage() {
                             <Calendar className="w-3 h-3" />
                             {format(new Date(p.send_at), 'MMM d, h:mm a')}
                           </div>
+                          <div className="pt-1 text-xs text-slate-800 break-all line-clamp-2">
+                            {p.text ? `"${p.text}"` : <span className="text-gray-400 italic">No text</span>}
+                          </div>
+                          {(p.content_type === 'photo' || p.content_type === 'video') && (
+                            <div className="text-[10px] text-blue-600 flex items-center gap-1 mt-0.5">
+                              {p.content_type === 'photo' ? <ImageIcon className="w-3 h-3" /> : <Video className="w-3 h-3" />}
+                              <a href={p.media_url ?? undefined} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                View Media
+                              </a>
+                            </div>
+                          )}
                           {p.error && <div className="text-xs text-red-500 mt-1">Error: {p.error}</div>}
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50" onClick={async () => {
