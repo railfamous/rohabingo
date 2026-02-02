@@ -467,6 +467,16 @@ export default function FlowEditPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            {n.type === 'single_choice' && (
+                              <p className="text-[10px] text-gray-400 mt-1 italic leading-tight">
+                                Optional. Ignored if options act as branches.
+                              </p>
+                            )}
+                            {n.type === 'multi_choice' && (
+                              <p className="text-[10px] text-blue-500 mt-1 font-medium leading-tight">
+                                Required. Used after user clicks "Continue".
+                              </p>
+                            )}
                           </div>
                         </div>
 
