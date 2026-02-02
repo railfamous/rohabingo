@@ -16,6 +16,7 @@ import {
   uploadFile,
   bulkUpsertModerationSetting,
 } from '@/lib/api';
+import { useRouter, useSearchParams } from 'next/navigation'; // Added
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,9 @@ export default function ModerationPage() {
   // Destination (Multi-select). Format: "chatId:chatType"
   const [selectedChats, setSelectedChats] = useState<string[]>([]);
   const [openCombobox, setOpenCombobox] = useState(false);
+
+  const router = useRouter(); // Added
+  const searchParams = useSearchParams(); // Added
 
   // This determines which chat's settings are currently SHOWN in the form.
   // When multiple are selected, this tracks the most recently clicked (or first).
@@ -129,6 +133,25 @@ export default function ModerationPage() {
       setModSettingsMap(m);
 
       if (!modChatDest && filteredChats.length > 0) {
+
+        // Check URL params first
+        const chatsParam = searchParams?.get('chats');
+        if (chatsParam) {
+          const chatIds = chatsParam.split(',').map(s => Number(s));
+          const validSelections: string[] = [];
+
+          chatIds.forEach(id => {
+            const c = filteredChats.find(x => x.chat_id === id);
+            if (c) validSelections.push(`${c.chat_id}:${c.chat_type}`);
+          });
+
+          if (validSelections.length > 0) {
+            setSelectedChats(validSelections);
+            setModChatDest(validSelections[0]);
+            return; // Skip default selection
+          }
+        }
+
         const c0 = filteredChats[0];
         const val = `${c0.chat_id}:${c0.chat_type}`;
         setModChatDest(val);
@@ -232,7 +255,7 @@ export default function ModerationPage() {
                               if (selectedChats.length === botChats.length) {
                                 setSelectedChats([]);
                               } else {
-                                const all = botChats.map(c => `${c.chat_id}:${c.chat_type}`);
+                                const all = botChats.map((c) => `${c.chat_id}:${c.chat_type}`);
                                 setSelectedChats(all);
                                 if (all.length > 0) setModChatDest(all[0]);
                               }
@@ -241,7 +264,7 @@ export default function ModerationPage() {
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 checked={botChats.length > 0 && selectedChats.length === botChats.length}
-                                onCheckedChange={() => { }} // handled by CommandItem
+                                onCheckedChange={() => { }}
                               />
                               <span>Select All ({botChats.length})</span>
                             </div>
@@ -262,6 +285,15 @@ export default function ModerationPage() {
                                     setModChatDest(val);
                                   }
                                   setSelectedChats(newSelected);
+
+                                  const ids = newSelected.map((s) => s.split(':')[0]).join(',');
+                                  const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+                                  if (ids) {
+                                    params.set('chats', ids);
+                                  } else {
+                                    params.delete('chats');
+                                  }
+                                  router.replace(`?${params.toString()}`);
                                 }}
                               >
                                 <div className="flex items-center gap-2 w-full">
@@ -278,7 +310,9 @@ export default function ModerationPage() {
                                   <span className="ml-auto text-[10px] text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded capitalize">
                                     {chat.chat_type === 'supergroup' ? 'group' : chat.chat_type}
                                   </span>
-                                  {val === modChatDest && <span className="text-[10px] text-blue-600 font-bold ml-1">EDITING</span>}
+                                  {val === modChatDest && (
+                                    <span className="text-[10px] text-blue-600 font-bold ml-1">EDITING</span>
+                                  )}
                                 </div>
                               </CommandItem>
                             );
@@ -648,6 +682,6 @@ export default function ModerationPage() {
           </Card>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

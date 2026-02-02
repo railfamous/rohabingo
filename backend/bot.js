@@ -147,6 +147,29 @@ class TelegramBot {
 
         logger.info(`[handleChatActivity] Processing ${type} for chat ${chatId} (${chatType})`);
 
+        // Handle Group -> Supergroup migration
+        if (msg.migrate_to_chat_id) {
+          const newChatId = msg.migrate_to_chat_id;
+          logger.info(`[Migration] Chat ${chatId} migrating to ${newChatId}`);
+
+          try {
+            // Update bot_chats
+            await pool.query(
+              `UPDATE bot_chats SET chat_id=$1, chat_type='supergroup', updated_at=NOW() WHERE chat_id=$2`,
+              [newChatId, chatId]
+            );
+            // Update settings
+            await pool.query(
+              `UPDATE chat_moderation_settings SET chat_id=$1, chat_type='supergroup' WHERE chat_id=$2`,
+              [newChatId, chatId]
+            );
+            logger.info(`[Migration] Successfully migrated DB records for ${chatId} -> ${newChatId}`);
+          } catch (err) {
+            logger.error(`[Migration] Failed to migrate DB records:`, err);
+          }
+          return;
+        }
+
         if (!['group', 'supergroup', 'channel'].includes(chatType)) return;
 
         // Register chat so admin can see chat_id in the dashboard
