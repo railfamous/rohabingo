@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import {
   createScheduledPost,
   createBulkScheduledPost, // Added
@@ -32,7 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 
-export default function ModerationPage() {
+function ModerationPageContent() {
   const [loading, setLoading] = useState(false);
 
   // Destination (Multi-select). Format: "chatId:chatType"
@@ -909,5 +909,13 @@ export default function ModerationPage() {
         </div>
       </div>
     </div >
+  );
+}
+
+export default function ModerationPage() {
+  return (
+    <Suspense fallback={<div>Loading moderation...</div>}>
+      <ModerationPageContent />
+    </Suspense>
   );
 }
