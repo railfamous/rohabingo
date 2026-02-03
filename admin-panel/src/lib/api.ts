@@ -501,20 +501,7 @@ export const deleteTelegramChannel = async (id: number): Promise<{ message: stri
   return response.data;
 };
 
-export interface TopUser {
-  id: number;
-  username: string;
-  first_name: string;
-  last_name: string;
-  photo_url: string | null;
-  completed_tasks_count: number;
-  referral_count: number;
-}
 
-export const getTopUsers = async (limit = 5): Promise<TopUser[]> => {
-  const response = await api.get(`/admin/top-users?limit=${limit}`);
-  return response.data.users;
-};
 
 export interface RecentActivity {
   type: 'task' | 'referral' | 'spin' | 'custom_quiz';
