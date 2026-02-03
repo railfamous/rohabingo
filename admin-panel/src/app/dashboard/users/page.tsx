@@ -106,8 +106,8 @@ export default function UsersPage() {
         </div>
       </div>
       <div className="mb-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Miniapp Users</h1>
-        <p className="text-gray-600 mb-4">Manage users of your Telegram miniapp</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Bot Users</h1>
+        <p className="text-gray-600 mb-4">Manage users of your Telegram bot</p>
       </div>
 
       {error && (
