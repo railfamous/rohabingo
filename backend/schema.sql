@@ -10,7 +10,13 @@ CREATE TABLE telegram_users (
   last_name VARCHAR(255),
   language_code VARCHAR(10) DEFAULT 'en',
   photo_url TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+  last_active TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW(),
+  points INTEGER DEFAULT 0,
+  referral_code VARCHAR(50),
+  is_banned BOOLEAN DEFAULT FALSE,
+  is_premium BOOLEAN DEFAULT FALSE,
+  premium_until TIMESTAMP
 );
 
 
