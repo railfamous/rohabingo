@@ -1748,4 +1748,57 @@ export const uploadFile = async (file: File, folder?: string): Promise<UploadRes
   return response.json();
 };
 
+// --- AI TEXT GENERATION (Groq) ---
+export interface AIGenerateOptions {
+  system_prompt?: string;
+  model?: string;
+  max_tokens?: number;
+}
+
+export interface AIGenerateResponse {
+  ok: boolean;
+  text: string;
+  model: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface AIStatusResponse {
+  configured: boolean;
+  model: string;
+}
+
+export const generateAIText = async (prompt: string, options?: AIGenerateOptions): Promise<AIGenerateResponse> => {
+  const response = await api.post('/admin/ai/generate', {
+    prompt,
+    ...options,
+  });
+  return response.data;
+};
+
+export const getAIStatus = async (): Promise<AIStatusResponse> => {
+  const response = await api.get('/admin/ai/status');
+  return response.data;
+};
+
+// Generate a complete flow question with options
+export interface FlowQuestionResponse {
+  ok: boolean;
+  question: string;
+  options: string[];
+  type: string;
+  model: string;
+}
+
+export const generateFlowQuestion = async (prompt: string, type: string): Promise<FlowQuestionResponse> => {
+  const response = await api.post('/admin/ai/generate-flow-question', {
+    prompt,
+    type,
+  });
+  return response.data;
+};
+
 export default api;
