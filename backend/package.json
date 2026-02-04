@@ -29,6 +29,7 @@
     "node-telegram-bot-api": "^0.61.0",
     "pdfkit": "^0.17.2",
     "pg": "^8.10.0",
+    "puppeteer": "^24.36.1",
     "telegram": "^2.18.37",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
