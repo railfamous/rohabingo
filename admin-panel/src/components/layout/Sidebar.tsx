@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
 
   // Primary communication & flow items
   { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox },
-  { name: 'Support Tickets', href: '/dashboard/user-requests', icon: FileQuestion, showCount: 'pending' },
+  //{ name: 'Support Tickets', href: '/dashboard/user-requests', icon: FileQuestion, showCount: 'pending' },
   { name: 'Flows', href: '/dashboard/flows', icon: Workflow },
 
   // Settings entry
