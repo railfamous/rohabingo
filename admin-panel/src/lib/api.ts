@@ -1801,4 +1801,28 @@ export const generateFlowQuestion = async (prompt: string, type: string): Promis
   return response.data;
 };
 
+// Get user's flow answers for inbox display
+export interface FlowAnswer {
+  node_key: string;
+  question: string;
+  answer: any;
+  type: string;
+}
+
+export interface FlowSession {
+  id: number;
+  flow_id: string;
+  flow_name: string;
+  flow_description: string;
+  answers: any;
+  questions: FlowAnswer[];
+  created_at: string;
+  updated_at: string;
+}
+
+export const getUserFlowAnswers = async (userId: number): Promise<{ sessions: FlowSession[] }> => {
+  const response = await api.get(`/admin/users/${userId}/flow-answers`);
+  return response.data;
+};
+
 export default api;
