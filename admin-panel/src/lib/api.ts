@@ -730,6 +730,89 @@ export const deleteScheduledPost = async (id: number) => {
   return response.data;
 };
 
+// --- Website Monitors (Auto-Post from Websites) ---
+export type WebsiteMonitor = {
+  id: number;
+  name: string;
+  website_url: string;
+  check_interval_minutes: number;
+  media_types: string[];
+  target_chat_ids: number[];
+  css_selector: string | null;
+  caption_template: string;
+  is_active: boolean;
+  last_checked_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  total_posts?: number;
+};
+
+export type WebsiteMediaPost = {
+  id: number;
+  monitor_id: number;
+  media_url: string;
+  media_type: string;
+  title: string | null;
+  posted_at: string;
+  chat_ids_posted: number[];
+};
+
+export type PreviewMediaItem = {
+  url: string;
+  type: string;
+  title: string;
+};
+
+export const getWebsiteMonitors = async (): Promise<{ monitors: WebsiteMonitor[] }> => {
+  const response = await api.get('/admin/website-monitors');
+  return response.data;
+};
+
+export const getWebsiteMonitor = async (id: number): Promise<{ monitor: WebsiteMonitor }> => {
+  const response = await api.get(`/admin/website-monitors/${id}`);
+  return response.data;
+};
+
+export const createWebsiteMonitor = async (data: Partial<WebsiteMonitor>): Promise<{ monitor: WebsiteMonitor }> => {
+  const response = await api.post('/admin/website-monitors', data);
+  return response.data;
+};
+
+export const updateWebsiteMonitor = async (id: number, data: Partial<WebsiteMonitor>): Promise<{ monitor: WebsiteMonitor }> => {
+  const response = await api.put(`/admin/website-monitors/${id}`, data);
+  return response.data;
+};
+
+export const deleteWebsiteMonitor = async (id: number): Promise<{ message: string }> => {
+  const response = await api.delete(`/admin/website-monitors/${id}`);
+  return response.data;
+};
+
+export const triggerWebsiteCheck = async (id: number): Promise<{ message: string; total_found: number; new_media: number; media: PreviewMediaItem[] }> => {
+  const response = await api.post(`/admin/website-monitors/${id}/check`);
+  return response.data;
+};
+
+export const postWebsiteMediaNow = async (id: number, data: { media_url: string; media_type: string; caption?: string }): Promise<{ message: string; posted_to: number[]; errors: any[] }> => {
+  const response = await api.post(`/admin/website-monitors/${id}/post-now`, data);
+  return response.data;
+};
+
+export const getWebsiteMonitorPosts = async (id: number, limit = 50): Promise<{ posts: WebsiteMediaPost[] }> => {
+  const response = await api.get(`/admin/website-monitors/${id}/posts?limit=${limit}`);
+  return response.data;
+};
+
+export const previewWebsiteMedia = async (url: string, mediaTypes?: string[], cssSelector?: string | null): Promise<{ message: string; total_found: number; media: PreviewMediaItem[] }> => {
+  const response = await api.post('/admin/website-monitors/preview', {
+    url,
+    media_types: mediaTypes,
+    css_selector: cssSelector
+  });
+  return response.data;
+};
+
 export const getFlow = async (id: number): Promise<{ flow: any; versions: any[] }> => {
   const response = await api.get(`/admin/flows/${id}`);
   return response.data;

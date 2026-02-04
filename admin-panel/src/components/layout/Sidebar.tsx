@@ -14,6 +14,7 @@ import {
   Megaphone,
   Radio,
   Users,
+  Globe,
   LucideIcon
 } from 'lucide-react';
 
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
   { name: 'Welcome Messages', href: '/dashboard/settings', icon: MessageSquareQuote },
   { name: 'Broadcast', href: '/dashboard/broadcast', icon: Megaphone },
   { name: 'Group/Channel', href: '/dashboard/moderation', icon: Radio },
+  { name: 'Auto Post', href: '/dashboard/auto-post', icon: Globe },
 ];
 
 export default function Sidebar() {

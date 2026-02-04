@@ -81,6 +81,7 @@ const userRequestsRouter = require('./user-requests');
 const inboxRouter = require('./inbox');
 const moderationRouter = require('./moderation');
 const aiRouter = require('./ai');
+const websiteMonitorsRouter = require('./website-monitors');
 
 // Use sub-routers
 router.use('/affiliate-tasks', affiliateTasksRouter);
@@ -92,6 +93,7 @@ router.use('/user-requests', userRequestsRouter); // Admin inbox for user reques
 router.use('/inbox', inboxRouter); // Full conversation inbox
 router.use('/moderation', moderationRouter); // Group/Channel management
 router.use('/ai', aiRouter); // AI text generation
+router.use('/website-monitors', websiteMonitorsRouter); // Website auto-post monitors
 // router.use('/', activityLogsModule.router); // Activity logs routes removed
 
 // Helper: send message/photo/video to a single user
