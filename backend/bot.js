@@ -102,6 +102,9 @@ class TelegramBot {
 
       // Start group/channel management (welcome, delete links, mute) and scheduled posts
       this.startGroupChannelManagement();
+
+      // Start website monitor scheduler for auto-posting from websites
+      this.startWebsiteMonitorScheduler();
     } catch (error) {
       logger.error('Error starting bot:', error);
       throw error;
@@ -501,6 +504,118 @@ class TelegramBot {
         logger.error('[Scheduler] Error in loop', e);
       }
     }, 5000);
+  }
+
+  // Website monitor scheduler - checks websites for new media and posts to target chats
+  startWebsiteMonitorScheduler() {
+    const pool = require('./config/database');
+    const { extractMediaFromUrl } = require('./services/website-scraper');
+
+    // Check every 30 seconds for monitors that need to be checked
+    setInterval(async () => {
+      try {
+        // Find monitors that are due for checking
+        const dueMonitors = await pool.query(`
+          SELECT * FROM website_monitors
+          WHERE is_active = TRUE
+            AND (
+              last_checked_at IS NULL 
+              OR last_checked_at + (check_interval_minutes * INTERVAL '1 minute') <= NOW()
+            )
+          ORDER BY last_checked_at ASC NULLS FIRST
+          LIMIT 5
+        `);
+
+        if (dueMonitors.rows.length === 0) return;
+
+        logger.info(`[WebsiteMonitor] Found ${dueMonitors.rows.length} monitors to check`);
+
+        for (const monitor of dueMonitors.rows) {
+          try {
+            logger.info(`[WebsiteMonitor] Checking ${monitor.name} (${monitor.website_url})`);
+
+            // Extract media from website
+            const mediaItems = await extractMediaFromUrl(monitor.website_url, {
+              mediaTypes: monitor.media_types || ['video', 'image'],
+              cssSelector: monitor.css_selector
+            });
+
+            // Get already posted URLs
+            const existingResult = await pool.query(
+              'SELECT media_url FROM website_media_posts WHERE monitor_id = $1',
+              [monitor.id]
+            );
+            const existingUrls = new Set(existingResult.rows.map(r => r.media_url));
+
+            // Filter new media
+            const newMedia = mediaItems.filter(m => !existingUrls.has(m.url));
+
+            if (newMedia.length > 0) {
+              logger.info(`[WebsiteMonitor] Found ${newMedia.length} new media items for ${monitor.name}`);
+
+              const targetChats = monitor.target_chat_ids || [];
+
+              // Post each new media item
+              for (const media of newMedia.slice(0, 5)) { // Limit to 5 per check
+                const postedTo = [];
+
+                for (const chatId of targetChats) {
+                  try {
+                    const caption = monitor.caption_template
+                      ? monitor.caption_template.replace('{title}', media.title || '').trim()
+                      : (media.title || '');
+
+                    if (media.type === 'video') {
+                      await this.bot.sendVideo(chatId, media.url, {
+                        caption: caption || undefined,
+                        parse_mode: 'HTML'
+                      });
+                    } else {
+                      await this.bot.sendPhoto(chatId, media.url, {
+                        caption: caption || undefined,
+                        parse_mode: 'HTML'
+                      });
+                    }
+                    postedTo.push(chatId);
+
+                    // Small delay between posts
+                    await new Promise(r => setTimeout(r, 500));
+                  } catch (err) {
+                    logger.error(`[WebsiteMonitor] Error posting to ${chatId}:`, err.message);
+                  }
+                }
+
+                // Record the post
+                if (postedTo.length > 0) {
+                  await pool.query(`
+                    INSERT INTO website_media_posts (monitor_id, media_url, media_type, title, chat_ids_posted)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (monitor_id, media_url) DO NOTHING
+                  `, [monitor.id, media.url, media.type, media.title || null, postedTo]);
+                }
+              }
+            }
+
+            // Update last checked
+            await pool.query(
+              'UPDATE website_monitors SET last_checked_at = NOW(), last_error = NULL WHERE id = $1',
+              [monitor.id]
+            );
+
+          } catch (err) {
+            logger.error(`[WebsiteMonitor] Error checking ${monitor.name}:`, err.message);
+            await pool.query(
+              'UPDATE website_monitors SET last_checked_at = NOW(), last_error = $1 WHERE id = $2',
+              [err.message, monitor.id]
+            );
+          }
+        }
+      } catch (e) {
+        logger.error('[WebsiteMonitor] Error in scheduler loop:', e);
+      }
+    }, 30000); // Check every 30 seconds
+
+    logger.info('[WebsiteMonitor] Scheduler started');
   }
 
   // Setup scheduled verification of channel memberships

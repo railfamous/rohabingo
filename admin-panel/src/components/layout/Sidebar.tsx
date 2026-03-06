@@ -14,6 +14,7 @@ import {
   Megaphone,
   Radio,
   Users,
+  Globe,
   LucideIcon
 } from 'lucide-react';
 
@@ -36,13 +37,14 @@ const navItems: NavItem[] = [
 
   // Primary communication & flow items
   { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox },
-  { name: 'Support Tickets', href: '/dashboard/user-requests', icon: FileQuestion, showCount: 'pending' },
+  //{ name: 'Support Tickets', href: '/dashboard/user-requests', icon: FileQuestion, showCount: 'pending' },
   { name: 'Flows', href: '/dashboard/flows', icon: Workflow },
 
   // Settings entry
   { name: 'Welcome Messages', href: '/dashboard/settings', icon: MessageSquareQuote },
   { name: 'Broadcast', href: '/dashboard/broadcast', icon: Megaphone },
   { name: 'Group/Channel', href: '/dashboard/moderation', icon: Radio },
+  { name: 'Auto Post', href: '/dashboard/auto-post', icon: Globe },
 ];
 
 export default function Sidebar() {

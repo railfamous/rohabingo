@@ -80,6 +80,8 @@ const flowsRouter = require('./flows');
 const userRequestsRouter = require('./user-requests');
 const inboxRouter = require('./inbox');
 const moderationRouter = require('./moderation');
+const aiRouter = require('./ai');
+const websiteMonitorsRouter = require('./website-monitors');
 
 // Use sub-routers
 router.use('/affiliate-tasks', affiliateTasksRouter);
@@ -90,6 +92,8 @@ router.use('/flows', flowsRouter);
 router.use('/user-requests', userRequestsRouter); // Admin inbox for user requests
 router.use('/inbox', inboxRouter); // Full conversation inbox
 router.use('/moderation', moderationRouter); // Group/Channel management
+router.use('/ai', aiRouter); // AI text generation
+router.use('/website-monitors', websiteMonitorsRouter); // Website auto-post monitors
 // router.use('/', activityLogsModule.router); // Activity logs routes removed
 
 // Helper: send message/photo/video to a single user
@@ -848,6 +852,124 @@ router.patch('/users/:id/ban',
       res.status(500).json({ message: 'Server error' });
     }
   });
+
+// Get user's flow answers
+router.get('/users/:userId/flow-answers', adminAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('[Flow Answers] Fetching for user:', userId);
+
+    // Query flow sessions for this user with flow metadata
+    const result = await pool.query(
+      `SELECT 
+        fs.id,
+        fs.flow_id,
+        fs.answers,
+        fs.history,
+        fs.current_node_id,
+        fs.created_at,
+        fs.updated_at,
+        f.title as flow_name,
+        f.description as flow_description
+      FROM flow_sessions fs
+      LEFT JOIN flows f ON f.slug = fs.flow_id
+      WHERE fs.user_id = $1
+      ORDER BY fs.updated_at DESC`,
+      [userId]
+    );
+
+    console.log('[Flow Answers] Found sessions:', result.rowCount);
+
+    // For each session, get the flow nodes to map question text
+    const sessionsWithQuestions = await Promise.all(
+      result.rows.map(async (session) => {
+        if (!session.answers || Object.keys(session.answers).length === 0) {
+          return { ...session, questions: [] };
+        }
+
+        // Get flow version ID from flow_versions table
+        const flowResult = await pool.query(
+          `SELECT fv.id as version_id 
+           FROM flows f
+           JOIN flow_versions fv ON fv.flow_id = f.id
+           WHERE f.slug = $1 AND fv.status = 'published'
+           LIMIT 1`,
+          [session.flow_id]
+        );
+
+        if (flowResult.rows.length === 0) {
+          return { ...session, questions: [] };
+        }
+
+        const versionId = flowResult.rows[0].version_id;
+
+        if (!versionId) {
+          return { ...session, questions: [] };
+        }
+
+        // Get nodes for this flow version
+        const nodesResult = await pool.query(
+          `SELECT fn.id, fn.node_key, fn.prompt_i18n, fn.type
+           FROM flow_nodes fn
+           WHERE fn.flow_version_id = $1`,
+          [versionId]
+        );
+
+        // Get all options for these nodes
+        const nodeIds = nodesResult.rows.map(n => n.id);
+        let optionsMap = {};
+        if (nodeIds.length > 0) {
+          const optionsResult = await pool.query(
+            `SELECT flow_node_id, option_key, label_i18n
+             FROM flow_options
+             WHERE flow_node_id = ANY($1)`,
+            [nodeIds]
+          );
+          // Build map: nodeId -> { optionKey -> label }
+          optionsResult.rows.forEach(opt => {
+            if (!optionsMap[opt.flow_node_id]) optionsMap[opt.flow_node_id] = {};
+            const label = opt.label_i18n?.en || opt.label_i18n || opt.option_key;
+            optionsMap[opt.flow_node_id][opt.option_key] = label;
+          });
+        }
+
+        // Map answers to questions with readable labels
+        const questions = [];
+        for (const [nodeKey, answer] of Object.entries(session.answers)) {
+          const node = nodesResult.rows.find(n => n.node_key === nodeKey);
+          if (node) {
+            // Convert option keys to readable labels
+            let displayAnswer = answer;
+            const nodeOptions = optionsMap[node.id] || {};
+
+            if (Array.isArray(answer)) {
+              // Multi-choice: array of option keys
+              displayAnswer = answer.map(key => nodeOptions[key] || key).join(', ');
+            } else if (typeof answer === 'string' && nodeOptions[answer]) {
+              // Single choice: single option key
+              displayAnswer = nodeOptions[answer];
+            }
+
+            questions.push({
+              node_key: nodeKey,
+              question: node.prompt_i18n?.en || node.prompt_i18n || 'Question',
+              answer: displayAnswer,
+              type: node.type
+            });
+          }
+        }
+
+        return { ...session, questions };
+      })
+    );
+
+    console.log('[Flow Answers] Returning', sessionsWithQuestions.length, 'sessions with questions');
+    res.json({ sessions: sessionsWithQuestions });
+  } catch (error) {
+    console.error('Error fetching user flow answers:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Toggle premium status for a user
 router.patch('/users/:id/premium',

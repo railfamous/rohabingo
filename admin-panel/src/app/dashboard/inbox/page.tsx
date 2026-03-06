@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { uploadFile } from '@/lib/api';
+import { uploadFile, generateAIText, getUserFlowAnswers, type FlowSession } from '@/lib/api';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Search, Send, Paperclip, Loader2, Image as ImageIcon, FileText, CheckCheck, MoreVertical, X } from 'lucide-react';
+import { Search, Send, Paperclip, Loader2, Image as ImageIcon, FileText, CheckCheck, MoreVertical, X, Sparkles, ChevronRight, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -76,6 +76,17 @@ export default function InboxPage() {
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // AI Generation State
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGeneratedText, setAiGeneratedText] = useState('');
+
+  // Flow Answers State
+  const [flowSessions, setFlowSessions] = useState<FlowSession[]>([]);
+  const [loadingFlows, setLoadingFlows] = useState(false);
+  const [showUserInfo, setShowUserInfo] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -147,6 +158,26 @@ export default function InboxPage() {
     const t = setInterval(loadConversations, 5000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    const conversationId = selectedId;
+    if (conversationId) {
+      loadMessages(conversationId, { silent: true });
+    }
+  }, [selectedId]);
+
+  // Load flow answers when conversation changes
+  useEffect(() => {
+    if (selectedConversation?.user_id) {
+      setLoadingFlows(true);
+      getUserFlowAnswers(selectedConversation.user_id)
+        .then(data => setFlowSessions(data.sessions || []))
+        .catch(() => setFlowSessions([]))
+        .finally(() => setLoadingFlows(false));
+    } else {
+      setFlowSessions([]);
+    }
+  }, [selectedConversation?.user_id]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -636,10 +667,99 @@ export default function InboxPage() {
                   </div>
                 )}
 
+                {/* AI Modal */}
+                {showAIModal && (
+                  <div className="mb-3 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100 animate-in slide-in-from-bottom-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-purple-600" />
+                        <span className="font-semibold text-sm text-purple-700">AI Text Generator</span>
+                      </div>
+                      <button onClick={() => { setShowAIModal(false); setAiPrompt(''); setAiGeneratedText(''); }} className="p-1 hover:bg-purple-100 rounded-full">
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+
+                    {!aiGeneratedText ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          placeholder="Describe what you want to write... (e.g., 'Write a friendly welcome message' or 'Reply apologizing for the delay')"
+                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                          rows={2}
+                          autoFocus
+                        />
+                        <Button
+                          onClick={async () => {
+                            if (!aiPrompt.trim()) return;
+                            setAiGenerating(true);
+                            try {
+                              const result = await generateAIText(aiPrompt);
+                              setAiGeneratedText(result.text);
+                            } catch (err: any) {
+                              toast.error(err?.response?.data?.message || err?.message || 'Failed to generate text');
+                            } finally {
+                              setAiGenerating(false);
+                            }
+                          }}
+                          disabled={!aiPrompt.trim() || aiGenerating}
+                          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        >
+                          {aiGenerating ? (
+                            <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</>
+                          ) : (
+                            <><Sparkles className="w-4 h-4 mr-2" /> Generate</>
+                          )}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="bg-white p-3 rounded-lg border text-sm whitespace-pre-wrap max-h-40 overflow-auto">
+                          {aiGeneratedText}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setAiGeneratedText('')}
+                          >
+                            Try Again
+                          </Button>
+                          <Button
+                            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                            onClick={() => {
+                              setReplyText((prev) => prev ? prev + '\n' + aiGeneratedText : aiGeneratedText);
+                              setShowAIModal(false);
+                              setAiPrompt('');
+                              setAiGeneratedText('');
+                              toast.success('Text inserted!');
+                            }}
+                          >
+                            Insert Text
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <form
                   className="flex items-end gap-2"
                   onSubmit={(e) => { e.preventDefault(); sendReply(); }}
                 >
+                  {/* AI Button */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={`h-12 w-12 rounded-xl shrink-0 ${showAIModal ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                    onClick={() => setShowAIModal(!showAIModal)}
+                    title="AI Text Generator"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </Button>
+
                   <div className="flex-1 relative">
                     <Input
                       value={replyText}
@@ -687,6 +807,82 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* User Info Panel with Flow Answers */}
+      {selectedConversation && (
+        <div className="w-80 border-l bg-white flex flex-col">
+          <div className="p-4 border-b">
+            <h3 className="font-semibold text-sm text-gray-900">User Info</h3>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {/* User Profile */}
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  {selectedConversation.photo_url && <AvatarImage src={selectedConversation.photo_url} />}
+                  <AvatarFallback className="bg-blue-100 text-blue-700">
+                    {(selectedConversation.first_name?.[0] || '?').toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">
+                    {selectedConversation.first_name || selectedConversation.username || 'User'}
+                    {selectedConversation.last_name ? ` ${selectedConversation.last_name}` : ''}
+                  </p>
+                  {selectedConversation.username && (
+                    <p className="text-xs text-blue-600 truncate">@{selectedConversation.username}</p>
+                  )}
+                  <p className="text-xs text-gray-500 font-mono">ID: {selectedConversation.user_id || selectedConversation.telegram_chat_id}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Flow Answers */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="w-4 h-4 text-purple-600" />
+                  <h4 className="font-semibold text-xs text-gray-700 uppercase tracking-wide">Flow Answers</h4>
+                </div>
+
+                {loadingFlows ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  </div>
+                ) : flowSessions.length > 0 ? (
+                  <div className="space-y-3">
+                    {flowSessions.map((session) => (
+                      <div key={session.id} className="border rounded-lg p-3 bg-purple-50/50">
+                        <p className="font-semibold text-xs text-purple-900 mb-2">
+                          {session.flow_name || session.flow_id}
+                        </p>
+                        {session.questions && session.questions.length > 0 ? (
+                          <div className="space-y-2">
+                            {session.questions.map((q, i) => (
+                              <div key={i} className="text-xs">
+                                <p className="text-gray-600 mb-0.5">• {q.question}</p>
+                                <p className="text-purple-700 font-medium pl-3">
+                                  → {typeof q.answer === 'string' ? q.answer : JSON.stringify(q.answer)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">No answers yet</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic py-4 text-center">
+                    No flow responses yet
+                  </p>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      )}
     </div>
   );
 }
