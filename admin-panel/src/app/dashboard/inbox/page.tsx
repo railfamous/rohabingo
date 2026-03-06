@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { uploadFile, generateAIText, getUserFlowAnswers, type FlowSession } from '@/lib/api';
+import { uploadFile, getUserFlowAnswers, type FlowSession } from '@/lib/api';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Search, Send, Paperclip, Loader2, Image as ImageIcon, FileText, CheckCheck, MoreVertical, X, Sparkles, ChevronRight, MessageSquare } from 'lucide-react';
+import { Search, Send, Paperclip, Loader2, Image as ImageIcon, FileText, CheckCheck, MoreVertical, X, ChevronRight, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -77,11 +77,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // AI Generation State
-  const [showAIModal, setShowAIModal] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGeneratedText, setAiGeneratedText] = useState('');
+
 
   // Flow Answers State
   const [flowSessions, setFlowSessions] = useState<FlowSession[]>([]);
@@ -667,98 +663,13 @@ export default function InboxPage() {
                   </div>
                 )}
 
-                {/* AI Modal */}
-                {showAIModal && (
-                  <div className="mb-3 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100 animate-in slide-in-from-bottom-2">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-600" />
-                        <span className="font-semibold text-sm text-purple-700">AI Text Generator</span>
-                      </div>
-                      <button onClick={() => { setShowAIModal(false); setAiPrompt(''); setAiGeneratedText(''); }} className="p-1 hover:bg-purple-100 rounded-full">
-                        <X className="w-4 h-4 text-gray-500" />
-                      </button>
-                    </div>
 
-                    {!aiGeneratedText ? (
-                      <div className="space-y-3">
-                        <textarea
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                          placeholder="Describe what you want to write... (e.g., 'Write a friendly welcome message' or 'Reply apologizing for the delay')"
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
-                          rows={2}
-                          autoFocus
-                        />
-                        <Button
-                          onClick={async () => {
-                            if (!aiPrompt.trim()) return;
-                            setAiGenerating(true);
-                            try {
-                              const result = await generateAIText(aiPrompt);
-                              setAiGeneratedText(result.text);
-                            } catch (err: any) {
-                              toast.error(err?.response?.data?.message || err?.message || 'Failed to generate text');
-                            } finally {
-                              setAiGenerating(false);
-                            }
-                          }}
-                          disabled={!aiPrompt.trim() || aiGenerating}
-                          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                        >
-                          {aiGenerating ? (
-                            <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</>
-                          ) : (
-                            <><Sparkles className="w-4 h-4 mr-2" /> Generate</>
-                          )}
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="bg-white p-3 rounded-lg border text-sm whitespace-pre-wrap max-h-40 overflow-auto">
-                          {aiGeneratedText}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setAiGeneratedText('')}
-                          >
-                            Try Again
-                          </Button>
-                          <Button
-                            className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                            onClick={() => {
-                              setReplyText((prev) => prev ? prev + '\n' + aiGeneratedText : aiGeneratedText);
-                              setShowAIModal(false);
-                              setAiPrompt('');
-                              setAiGeneratedText('');
-                              toast.success('Text inserted!');
-                            }}
-                          >
-                            Insert Text
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <form
                   className="flex items-end gap-2"
                   onSubmit={(e) => { e.preventDefault(); sendReply(); }}
                 >
-                  {/* AI Button */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={`h-12 w-12 rounded-xl shrink-0 ${showAIModal ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                    onClick={() => setShowAIModal(!showAIModal)}
-                    title="AI Text Generator"
-                  >
-                    <Sparkles className="w-5 h-5" />
-                  </Button>
+
 
                   <div className="flex-1 relative">
                     <Input

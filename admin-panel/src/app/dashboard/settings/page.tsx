@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle, ArrowUp, ArrowDown, Eye, EyeOff, Trash2, Plus, Image as ImageIcon, Video, Link as LinkIcon, Type, Workflow, Sparkles, X, Loader2 } from 'lucide-react';
+import { Settings, Save, RefreshCw, DollarSign, Crown, MessageCircle, ArrowUp, ArrowDown, Eye, EyeOff, Trash2, Plus, Image as ImageIcon, Video, Link as LinkIcon, Type, Workflow, X, Loader2 } from 'lucide-react';
 
 import { motion } from 'framer-motion';
 import {
@@ -21,7 +21,6 @@ import {
   OnboardingQuestion,
   OnboardingAnswer,
   getFlows,
-  generateAIText
 } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -52,11 +51,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // AI Generation State
-  const [aiModalBlockIdx, setAiModalBlockIdx] = useState<number | null>(null);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGeneratedText, setAiGeneratedText] = useState('');
+
   useEffect(() => {
     fetchSettings();
 
@@ -372,88 +367,6 @@ export default function SettingsPage() {
                   <div className="space-y-3">
                     {b.block_type === 'text' && (
                       <div className="space-y-2">
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md ${aiModalBlockIdx === idx ? 'bg-purple-100 text-purple-600' : 'text-gray-500 hover:text-purple-600 hover:bg-purple-50'}`}
-                            onClick={() => setAiModalBlockIdx(aiModalBlockIdx === idx ? null : idx)}
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            AI Generate
-                          </button>
-                        </div>
-
-                        {aiModalBlockIdx === idx && (
-                          <div className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100 animate-in slide-in-from-top-2">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-3 h-3 text-purple-600" />
-                                <span className="font-semibold text-xs text-purple-700">AI Generator</span>
-                              </div>
-                              <button onClick={() => { setAiModalBlockIdx(null); setAiPrompt(''); setAiGeneratedText(''); }} className="p-1 hover:bg-purple-100 rounded">
-                                <X className="w-3 h-3 text-gray-500" />
-                              </button>
-                            </div>
-
-                            {!aiGeneratedText ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={aiPrompt}
-                                  onChange={(e) => setAiPrompt(e.target.value)}
-                                  placeholder="Describe your welcome message... (e.g., 'Write a friendly welcome for new bot users')"
-                                  className="w-full px-2 py-1.5 border rounded text-xs focus:ring-1 focus:ring-purple-500 resize-none"
-                                  rows={2}
-                                  autoFocus
-                                />
-                                <button
-                                  type="button"
-                                  className="w-full py-1.5 px-3 text-xs text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                  disabled={!aiPrompt.trim() || aiGenerating}
-                                  onClick={async () => {
-                                    if (!aiPrompt.trim()) return;
-                                    setAiGenerating(true);
-                                    try {
-                                      const result = await generateAIText(aiPrompt, {
-                                        system_prompt: 'You are writing welcome messages for a Telegram bot. Write friendly, engaging messages. Keep them concise (under 100 words). Do not use markdown formatting.'
-                                      });
-                                      setAiGeneratedText(result.text);
-                                    } catch (err: any) {
-                                      toast.error(err?.response?.data?.message || err?.message || 'Failed to generate');
-                                    } finally {
-                                      setAiGenerating(false);
-                                    }
-                                  }}
-                                >
-                                  {aiGenerating ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</> : <><Sparkles className="w-3 h-3" /> Generate</>}
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                <div className="bg-white p-2 rounded border text-xs whitespace-pre-wrap max-h-24 overflow-auto">
-                                  {aiGeneratedText}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button type="button" className="flex-1 py-1 px-2 text-xs border rounded bg-white" onClick={() => setAiGeneratedText('')}>Try Again</button>
-                                  <button
-                                    type="button"
-                                    className="flex-1 py-1 px-2 text-xs text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded"
-                                    onClick={() => {
-                                      const copy = [...(welcomeBlocks || [])];
-                                      copy[idx] = { ...copy[idx], payload: { ...(copy[idx].payload || {}), text: aiGeneratedText } };
-                                      setWelcomeBlocks(copy);
-                                      setAiModalBlockIdx(null);
-                                      setAiPrompt('');
-                                      setAiGeneratedText('');
-                                      toast.success('Text inserted!');
-                                    }}
-                                  >
-                                    Insert
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         <textarea
                           className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"

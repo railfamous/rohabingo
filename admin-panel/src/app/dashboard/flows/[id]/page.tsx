@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Save, Smartphone, Plus, Trash2, GripVertical, ArrowRight, MessageCircle, List, Calendar, FileText, Hash, CheckCircle2, AlertCircle, Sparkles, X, Loader2 } from 'lucide-react';
+import { RefreshCw, Save, Smartphone, Plus, Trash2, GripVertical, ArrowRight, MessageCircle, List, Calendar, FileText, Hash, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -21,7 +21,6 @@ import {
   upsertFlowOption,
   deleteFlowOption,
   validateFlowVersion,
-  generateFlowQuestion
 } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -72,12 +71,7 @@ export default function FlowEditPage() {
   // Preview State
   const [previewNodeKey, setPreviewNodeKey] = useState<string | null>(null);
 
-  // AI Generation State
-  const [aiModalNodeKey, setAiModalNodeKey] = useState<string | null>(null);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGeneratedText, setAiGeneratedText] = useState('');
-  const [aiGeneratedOptions, setAiGeneratedOptions] = useState<string[]>([]);
+
 
   // Debugging logs
   useEffect(() => {
@@ -490,129 +484,7 @@ export default function FlowEditPage() {
 
                         {/* Prompt */}
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <Label className="text-xs text-muted-foreground block">Message Text</Label>
-                            <button
-                              type="button"
-                              className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded ${aiModalNodeKey === n.node_key ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                              onClick={(e) => { e.stopPropagation(); setAiModalNodeKey(aiModalNodeKey === n.node_key ? null : n.node_key); }}
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              AI
-                            </button>
-                          </div>
-
-                          {aiModalNodeKey === n.node_key && (
-                            <div className="mb-2 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100 animate-in slide-in-from-top-2">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1.5">
-                                  <Sparkles className="w-3 h-3 text-purple-600" />
-                                  <span className="font-semibold text-xs text-purple-700">AI Question Generator</span>
-                                </div>
-                                <button onClick={(e) => { e.stopPropagation(); setAiModalNodeKey(null); setAiPrompt(''); setAiGeneratedText(''); setAiGeneratedOptions([]); }} className="p-1 hover:bg-purple-100 rounded">
-                                  <X className="w-3 h-3 text-gray-500" />
-                                </button>
-                              </div>
-
-                              {!aiGeneratedText ? (
-                                <div className="space-y-2">
-                                  <textarea
-                                    value={aiPrompt}
-                                    onChange={(e) => setAiPrompt(e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder={isChoice
-                                      ? "Describe the question AND options... (e.g., 'Ask for favorite color with options Red, Blue, Green, Yellow')"
-                                      : `Describe what to ask... (e.g., 'Ask user for their name')`
-                                    }
-                                    className="w-full px-2 py-1.5 border rounded text-xs focus:ring-1 focus:ring-purple-500 resize-none"
-                                    rows={2}
-                                    autoFocus
-                                  />
-                                  {isChoice && (
-                                    <p className="text-[10px] text-purple-600 leading-tight">💡 AI will auto-generate question text AND button options!</p>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className="w-full py-1.5 px-3 text-xs text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                    disabled={!aiPrompt.trim() || aiGenerating}
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (!aiPrompt.trim()) return;
-                                      setAiGenerating(true);
-                                      try {
-                                        const result = await generateFlowQuestion(aiPrompt, n.type);
-                                        setAiGeneratedText(result.question);
-                                        setAiGeneratedOptions(result.options || []);
-                                      } catch (err: any) {
-                                        toast.error(err?.response?.data?.message || err?.message || 'Failed to generate');
-                                      } finally {
-                                        setAiGenerating(false);
-                                      }
-                                    }}
-                                  >
-                                    {aiGenerating ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</> : <><Sparkles className="w-3 h-3" /> Generate</>}
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="space-y-2">
-                                  <div className="bg-white p-2 rounded border text-xs">
-                                    <div className="font-medium text-gray-700 mb-1">Question:</div>
-                                    <div className="whitespace-pre-wrap">{aiGeneratedText}</div>
-                                  </div>
-                                  {aiGeneratedOptions.length > 0 && (
-                                    <div className="bg-white p-2 rounded border text-xs">
-                                      <div className="font-medium text-gray-700 mb-1">Options ({aiGeneratedOptions.length}):</div>
-                                      <div className="flex flex-wrap gap-1">
-                                        {aiGeneratedOptions.map((opt, i) => (
-                                          <span key={i} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px]">{opt}</span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  <div className="flex gap-2">
-                                    <button type="button" className="flex-1 py-1 px-2 text-xs border rounded bg-white" onClick={(e) => { e.stopPropagation(); setAiGeneratedText(''); setAiGeneratedOptions([]); }}>Try Again</button>
-                                    <button
-                                      type="button"
-                                      className="flex-1 py-1 px-2 text-xs text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Update the question text
-                                        setNodes(nodes.map((x) => x.node_key === n.node_key ? { ...x, prompt_i18n: { ...(x.prompt_i18n || {}), en: aiGeneratedText } } : x));
-
-                                        // If we have options, create them
-                                        if (aiGeneratedOptions.length > 0 && isChoice) {
-                                          // Remove existing options for this node
-                                          const newOptions = options.filter(o => o.node_key !== n.node_key && o.flow_node_id !== n.id);
-
-                                          // Add new AI-generated options
-                                          aiGeneratedOptions.forEach((optLabel, i) => {
-                                            newOptions.push({
-                                              flow_node_id: n.id || null,
-                                              node_key: n.node_key,
-                                              option_key: `opt_${i + 1}`,
-                                              label_i18n: { en: optLabel },
-                                              sort_order: i
-                                            });
-                                          });
-                                          setOptions(newOptions);
-                                          toast.success(`Question + ${aiGeneratedOptions.length} options inserted!`);
-                                        } else {
-                                          toast.success('Question inserted!');
-                                        }
-
-                                        setAiModalNodeKey(null);
-                                        setAiPrompt('');
-                                        setAiGeneratedText('');
-                                        setAiGeneratedOptions([]);
-                                      }}
-                                    >
-                                      Insert {aiGeneratedOptions.length > 0 ? 'All' : ''}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          <Label className="text-xs text-muted-foreground block mb-1">Message Text</Label>
 
                           <Textarea
                             value={n.prompt_i18n?.en || ''}
