@@ -161,9 +161,7 @@ DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=change_this_secure_password
 ADMIN_JWT_SECRET=generate_long_random_string_here
 
-# Supabase (for file uploads)
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+# File uploads are stored locally in backend/uploads/ (no external service needed)
 
 # Optional
 DISABLE_TELEGRAM_AUTH=false
@@ -468,8 +466,6 @@ services:
       - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
       - ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - NODE_ENV=production
       - PORT=3001
     ports:
@@ -565,8 +561,6 @@ echo "BOT_USERNAME=your_bot_username" >> .env
 echo "DEFAULT_ADMIN_USERNAME=admin" >> .env
 echo "DEFAULT_ADMIN_PASSWORD=secure_password" >> .env
 echo "ADMIN_JWT_SECRET=your_jwt_secret" >> .env
-echo "SUPABASE_URL=your_supabase_url" >> .env
-echo "SUPABASE_SERVICE_ROLE_KEY=your_supabase_key" >> .env
 
 # Build and start containers
 docker-compose up -d --build

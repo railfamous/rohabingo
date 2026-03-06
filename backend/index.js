@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const path = require('path');
 const pool = require('./config/database');
 const { createBot } = require('./bot');
 const { logger, logHelper } = require('./config/logger');
@@ -113,6 +114,9 @@ app.use(express.json({ limit: '1mb' })); // Limit payload size
 app.use(express.urlencoded({ extended: true, limit: '1mb' })); // Handle form data
 
 console.log('Mounting routes...');
+// Serve uploaded files from local storage
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Initialize admin roles removed
 // const { initializeAdminRoles } = require('./admin/initialize');
 

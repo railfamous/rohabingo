@@ -1,43 +1,31 @@
 const express = require('express');
 const multer = require('multer');
-const { createClient } = require('@supabase/supabase-js');
 const { adminAuth } = require('./auth');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 
 const router = express.Router();
 
-// Initialize Supabase client (optional)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Ensure upload directory exists
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'admin-content');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-let supabase = null;
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('Supabase is not configured. Admin upload endpoints will be disabled until SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.', {
-    hasUrl: !!supabaseUrl,
-    hasServiceKey: !!supabaseServiceKey
-  });
-} else {
-  supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-}
+// Configure multer for local disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const randomString = crypto.randomBytes(8).toString('hex');
+    const extension = path.extname(file.originalname).toLowerCase();
+    const folder = req.body?.folder || 'admin-uploads';
+    const fileName = `${folder}_${timestamp}_${randomString}${extension}`;
+    cb(null, fileName);
+  }
+});
 
-function ensureSupabaseConfigured(res) {
-  if (supabase) return true;
-
-  res.status(503).json({
-    message: 'File uploads are not configured on this server.',
-    requiredEnv: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
-  });
-  return false;
-}
-
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
@@ -67,10 +55,8 @@ const upload = multer({
   }
 });
 
-// Upload file to Supabase Storage (Admin version)
+// Upload file to local storage (Admin version)
 router.post('/', adminAuth, upload.single('file'), async (req, res) => {
-  if (!ensureSupabaseConfigured(res)) return;
-
   try {
     const adminId = req.admin?.id || 'admin';
 
@@ -79,68 +65,18 @@ router.post('/', adminAuth, upload.single('file'), async (req, res) => {
     }
 
     const file = req.file;
-    const { folder = 'admin-uploads' } = req.body; // Allow specifying folder
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = crypto.randomBytes(8).toString('hex');
-    const extension = path.extname(file.originalname).toLowerCase();
-    const fileName = `${folder}_${timestamp}_${randomString}${extension}`;
-
-    // Upload to Supabase Storage
-    const bucketName = 'admin-content';
-
-    // Try to get bucket info (this will fail if bucket doesn't exist)
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-
-    if (listError) {
-      console.error('Error listing buckets:', listError);
-    } else {
-      const bucketExists = buckets.some(bucket => bucket.name === bucketName);
-
-      if (!bucketExists) {
-        // Create bucket if it doesn't exist
-        const { data: createData, error: createError } = await supabase.storage.createBucket(bucketName, {
-          public: true
-        });
-
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          return res.status(500).json({ message: 'Failed to create storage bucket', error: createError.message });
-        }
-        console.log('Created bucket:', bucketName);
-      }
-    }
-
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(fileName, file.buffer, {
-        contentType: file.mimetype,
-        metadata: {
-          adminId: adminId.toString(),
-          originalName: file.originalname,
-          uploadedAt: new Date().toISOString(),
-          folder: folder
-        }
-      });
-
-    if (error) {
-      console.error('Supabase upload error:', error);
-      return res.status(500).json({ message: 'Failed to upload file to storage', error: error.message });
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(fileName);
+    // Build public URL
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const publicUrl = `${baseUrl}/uploads/admin-content/${file.filename}`;
 
     // Log the upload for tracking
-    console.log(`File uploaded successfully by admin: ${fileName} by admin ${adminId}`);
+    console.log(`File uploaded successfully by admin: ${file.filename} by admin ${adminId}`);
 
     res.json({
       message: 'File uploaded successfully',
       url: publicUrl,
-      fileName: fileName,
+      fileName: file.filename,
       originalName: file.originalname,
       size: file.size,
       mimeType: file.mimetype
@@ -162,19 +98,20 @@ router.post('/', adminAuth, upload.single('file'), async (req, res) => {
 
 // Delete uploaded file (admin version)
 router.delete('/:fileName', adminAuth, async (req, res) => {
-  if (!ensureSupabaseConfigured(res)) return;
-
   try {
     const { fileName } = req.params;
+    const filePath = path.join(UPLOAD_DIR, fileName);
 
-    const { error } = await supabase.storage
-      .from('admin-content')
-      .remove([fileName]);
-
-    if (error) {
-      console.error('Supabase delete error:', error);
-      return res.status(500).json({ message: 'Failed to delete file', error: error.message });
+    // Prevent path traversal
+    if (!filePath.startsWith(UPLOAD_DIR)) {
+      return res.status(400).json({ message: 'Invalid file name' });
     }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    fs.unlinkSync(filePath);
 
     res.json({ message: 'File deleted successfully' });
 

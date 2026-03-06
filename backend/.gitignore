@@ -6,6 +6,9 @@
 # Bot session
 bot_sessions/
 
+# Uploaded files (local storage)
+uploads/
+
 # Dependencies
 /node_modules
 

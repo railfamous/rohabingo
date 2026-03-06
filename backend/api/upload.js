@@ -1,43 +1,31 @@
 const express = require('express');
 const multer = require('multer');
-const { createClient } = require('@supabase/supabase-js');
 const auth = require('../middleware/auth');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 
 const router = express.Router();
 
-// Initialize Supabase client (optional)
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Ensure upload directory exists
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'affiliate-proofs');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-let supabase = null;
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('Supabase is not configured. Upload endpoints will be disabled until SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.', {
-    hasUrl: !!supabaseUrl,
-    hasServiceKey: !!supabaseServiceKey
-  });
-} else {
-  supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-}
+// Configure multer for local disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const randomString = crypto.randomBytes(8).toString('hex');
+    const extension = path.extname(file.originalname).toLowerCase();
+    const userId = req.telegramUser?.id || 'unknown';
+    const fileName = `proof_${userId}_${timestamp}_${randomString}${extension}`;
+    cb(null, fileName);
+  }
+});
 
-function ensureSupabaseConfigured(res) {
-  if (supabase) return true;
-
-  res.status(503).json({
-    message: 'File uploads are not configured on this server.',
-    requiredEnv: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
-  });
-  return false;
-}
-
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
@@ -47,7 +35,7 @@ const upload = multer({
     // Allow images, videos, and PDFs
     const allowedTypes = [
       'image/jpeg',
-      'image/jpg', 
+      'image/jpg',
       'image/png',
       'image/gif',
       'image/webp',
@@ -58,7 +46,7 @@ const upload = multer({
       'video/webm',
       'application/pdf'
     ];
-    
+
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -67,10 +55,8 @@ const upload = multer({
   }
 });
 
-// Upload file to Supabase Storage
+// Upload file to local storage
 router.post('/', auth, upload.single('file'), async (req, res) => {
-  if (!ensureSupabaseConfigured(res)) return;
-
   try {
     const userId = req.telegramUser?.id;
     if (!userId) {
@@ -82,67 +68,18 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
     }
 
     const file = req.file;
-    
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = crypto.randomBytes(8).toString('hex');
-    const extension = path.extname(file.originalname).toLowerCase();
-    const fileName = `proof_${userId}_${timestamp}_${randomString}${extension}`;
-    
-    // Upload to Supabase Storage
-    // First, ensure the bucket exists or create it
-    const bucketName = 'affiliate-proofs';
-    
-    // Try to get bucket info (this will fail if bucket doesn't exist)
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error listing buckets:', listError);
-    } else {
-      const bucketExists = buckets.some(bucket => bucket.name === bucketName);
-      
-      if (!bucketExists) {
-        // Create bucket if it doesn't exist
-        const { data: createData, error: createError } = await supabase.storage.createBucket(bucketName, {
-          public: true
-        });
-        
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          return res.status(500).json({ message: 'Failed to create storage bucket', error: createError.message });
-        }
-        console.log('Created bucket:', bucketName);
-      }
-    }
-    
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(fileName, file.buffer, {
-        contentType: file.mimetype,
-        metadata: {
-          userId: userId.toString(),
-          originalName: file.originalname,
-          uploadedAt: new Date().toISOString()
-        }
-      });
 
-    if (error) {
-      console.error('Supabase upload error:', error);
-      return res.status(500).json({ message: 'Failed to upload file to storage', error: error.message });
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('affiliate-proofs')
-      .getPublicUrl(fileName);
+    // Build public URL
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const publicUrl = `${baseUrl}/uploads/affiliate-proofs/${file.filename}`;
 
     // Log the upload for tracking
-    console.log(`File uploaded successfully: ${fileName} by user ${userId}`);
+    console.log(`File uploaded successfully: ${file.filename} by user ${userId}`);
 
     res.json({
       message: 'File uploaded successfully',
       url: publicUrl,
-      fileName: fileName,
+      fileName: file.filename,
       originalName: file.originalname,
       size: file.size,
       mimeType: file.mimetype
@@ -150,22 +87,20 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
 
   } catch (error) {
     console.error('Upload error:', error);
-    
+
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ message: 'File size too large. Maximum size is 10MB.' });
       }
       return res.status(400).json({ message: 'File upload error: ' + error.message });
     }
-    
+
     res.status(500).json({ message: 'Server error during file upload' });
   }
 });
 
-// Delete uploaded file (optional - for cleanup)
+// Delete uploaded file
 router.delete('/:fileName', auth, async (req, res) => {
-  if (!ensureSupabaseConfigured(res)) return;
-
   try {
     const userId = req.telegramUser?.id;
     if (!userId) {
@@ -173,20 +108,24 @@ router.delete('/:fileName', auth, async (req, res) => {
     }
 
     const { fileName } = req.params;
-    
+
     // Verify the file belongs to the user (basic security check)
     if (!fileName.includes(`_${userId}_`)) {
       return res.status(403).json({ message: 'Not authorized to delete this file' });
     }
 
-    const { error } = await supabase.storage
-      .from('affiliate-proofs')
-      .remove([fileName]);
+    const filePath = path.join(UPLOAD_DIR, fileName);
 
-    if (error) {
-      console.error('Supabase delete error:', error);
-      return res.status(500).json({ message: 'Failed to delete file', error: error.message });
+    // Prevent path traversal
+    if (!filePath.startsWith(UPLOAD_DIR)) {
+      return res.status(400).json({ message: 'Invalid file name' });
     }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    fs.unlinkSync(filePath);
 
     res.json({ message: 'File deleted successfully' });
 
