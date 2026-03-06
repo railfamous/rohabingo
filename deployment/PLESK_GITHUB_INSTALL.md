@@ -136,6 +136,20 @@ Deployment mode: Manual deploy
 
 ## ⚙️ Step 5: Environment Configuration
 
+### 5.0 Supabase Storage Setup (For File Uploads)
+
+If you plan to use file uploads (e.g., images/media), set up Supabase and collect the required credentials.
+
+1. Go to https://supabase.com/ and create a new project.
+2. Once created, go to **Project Settings** (gear icon at the bottom left).
+3. In **Project Settings**, look for the sections under **Configuration** / **API**.
+4. Copy the following values:
+   - Under **Data API**, copy the `URL`. This is your `SUPABASE_URL`.
+   - Under **API keys**, you will see `anon` and `service_role`.
+   - Copy the `service_role` key. This is your `SUPABASE_SERVICE_ROLE_KEY` (click **Reveal** to see it).
+
+Keep these values private. **Do not commit them to GitHub.**
+
 ### 5.1 Backend Environment
 
 1. In File Manager, navigate to `backend`
@@ -156,8 +170,10 @@ DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=your_secure_admin_password
 ADMIN_JWT_SECRET=your_very_long_random_secret_key_here
 
-# Supabase Configuration 
+# Supabase Configuration (for file uploads)
+# From Supabase Project Settings -> API
 SUPABASE_URL=
+# From Supabase Project Settings -> API keys -> service_role
 SUPABASE_SERVICE_ROLE_KEY=
 
 # Server Configuration
