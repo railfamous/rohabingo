@@ -1,433 +1,275 @@
-# BotDash Plesk GitHub Installation Guide
+# BotDash on Plesk (Simple Client Guide)
+It shows exactly where to click in Plesk and how to run this project from GitHub.
 
-This guide provides step-by-step instructions for deploying BotDash from GitHub to a Plesk-controlled server.
+---
 
+## A) Before you start (you need these)
 
-## 📋 Prerequisites
+1. Your Plesk login
+2. Your domain already pointing to the server
+3. GitHub repository URL
+4. Telegram bot token from @BotFather
+5. Database password you want to use
 
-### Server Requirements
-- Plesk control panel (Obsidian or later)
-- Node.js support enabled in Plesk
-- PostgreSQL or MySQL database
-- SSH access (recommended)
-- Domain name configured in Plesk
+---
 
-### GitHub Requirements
-- GitHub repository URL
-- Git access (public repo or SSH keys for private)
+## B) Understand Plesk screen positions
 
-## 🛠️ Step 1: Plesk Server Setup
+Use this quick map while reading steps:
 
-### 1.1 Enable Node.js Support
+- **Left Sidebar (server/global tools)**
+  - `Tools & Settings`
+  - `Websites & Domains`
 
-1. Log in to Plesk as admin
-2. Go to **Tools & Settings** → **Updates**
-3. Click **Add/Remove Components**
-4. Under **Web hosting**, check **Node.js support**
-5. Click **Continue** → **Continue** to install
+- **Main Content Area (center/right panel)**
+  - Cards/buttons like `Databases`, `Node.js`, `Git`, `File Manager`, `SSL/TLS Certificates`
 
-### 1.2 Verify Installation
+- **Top-right area (inside pages)**
+  - Buttons like `Add`, `Pull Updates`, `Restart App`
 
-1. Go to **Tools & Settings** → **Server Components**
-2. Verify Node.js is listed (version 18+ recommended)
-3. Note the available Node.js versions
+---
 
-### 1.3 Database Setup
+## C) Recommended setup (easy)
 
-#### PostgreSQL (Recommended)
-1. Go to **Tools & Settings** → **Database Servers**
-2. Click **Add Database Server**
-3. Select **PostgreSQL**
-4. Configure:
-   - **Database server name**: PostgreSQL
-   - **IP address**: localhost
-   - **Port**: 5432
-   - **Administrator username**: postgres
-   - **Administrator password**: [set secure password]
-5. Click **OK**
+Use 2 subdomains:
+- `app.yourdomain.com` → frontend (`admin-panel`)
+- `api.yourdomain.com` → backend (`backend`)
 
-#### MySQL/MariaDB (Alternative)
-1. Usually pre-installed in Plesk
-2. Go to **Tools & Settings** → **Database Servers**
-3. Note the connection details
+This is easiest in Plesk and easiest to maintain.
 
-## 🌐 Step 2: Create Subscription and Domain
+---
 
-### 2.1 Create Subscription
+## D) Step-by-step deployment
 
-1. In Plesk, go to **Subscriptions**
-2. Click **Add Subscription**
-3. Configure:
-   - **Domain name**: your-domain.com
-   - **IP address**: [select available IP]
-   - **Performance**: [select appropriate plan]
-4. Click **Continue**
-5. Set **Administrator username** and **password**
-6. Click **Finish**
+## Step 1: Check Node.js support in Plesk
 
-### 2.2 Configure Domain
+**Where:**
+- **Left Sidebar** → `Tools & Settings`
+- **Main Area** → `Updates`
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Hosting Settings**
-3. Configure:
-   - **Document root**: /httpdocs
-   - **PHP version**: [select latest]
-   - **Access to server over SSH**: [enable]
-4. Click **OK**
+Do:
+1. Open `Tools & Settings`.
+2. Open `Updates`.
+3. Ensure Node.js support is installed.
 
-## 📥 Step 3: Deploy from GitHub
+---
 
-### 3.1 Add Git Repository
+## Step 2: Create subdomains
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Git** in the left panel
-3. Click **Add Repository**
-4. Configure Git settings:
+**Where:**
+- **Left Sidebar** → `Websites & Domains`
+- **Main Area** → your domain page
+- **Top-right** → `Add Subdomain`
 
-```
-Repository URL: https://github.com/your-username/BotDash.git
-Repository branch: main
-Deployment path: httpdocs
-Deployment mode: Manual deploy
-```
+Create:
+1. `app.yourdomain.com`
+2. `api.yourdomain.com`
 
-5. Click **OK**
+---
 
-### 3.2 Pull Repository
+## Step 3: Add GitHub repo for each subdomain
 
-1. Click on your repository
-2. Click **Pull Updates**
-3. Wait for the repository to be cloned
-4. Verify files appear in File Manager
+Do these steps two times (once in `app`, once in `api`).
 
-### 3.3 Set File Permissions
+**Where:**
+- **Left Sidebar** → `Websites & Domains`
+- Click subdomain (`app...` or `api...`)
+- **Main Area** card/button → `Git`
+- **Top-right** → `Add Repository`
 
-1. Go to **File Manager**
-2. Select all files and folders
-3. Right-click → **Change Permissions**
-4. Set permissions:
-   - **Owner**: Read, Write, Execute
-   - **Group**: Read, Execute  
-   - **Others**: Read, Execute
-5. Click **OK**
+Git settings:
+- Repository URL: your GitHub URL
+- Branch: your deploy branch (example: `main`)
+- Deployment path: default of that subdomain
 
-## 🗄️ Step 4: Database Configuration
+Then:
+- Click `Pull Updates` (top-right in Git page)
 
-### 4.1 Create Database
+---
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Databases**
-3. Click **Add Database**
-4. Configure:
-   - **Database name**: botdash
-   - **Database server**: [select PostgreSQL]
-   - **Database user**: botdash_user
-   - **Password**: [generate strong password]
-5. Click **OK**
+## Step 4: Create database
 
-### 4.2 Import Database Schema
+**Where:**
+- **Left Sidebar** → `Websites & Domains`
+- Click `api.yourdomain.com`
+- **Main Area** → `Databases`
+- **Top-right** → `Add Database`
 
-1. In File Manager, navigate to `backend`
-2. Find `schema.sql`
-3. Go to **Databases** → your database
-4. Click **Import Dump**
-5. Upload `schema.sql`
-6. Wait for import to complete
+Create:
+- DB name: `botdash`
+- DB user: `botdash_user`
+- Strong password
 
-## ⚙️ Step 5: Environment Configuration
+Save these for env vars.
 
-### 5.0 Supabase Storage Setup (For File Uploads)
+---
 
-If you plan to use file uploads (e.g., images/media), set up Supabase and collect the required credentials.
+## Step 5: Configure backend Node.js app (api subdomain)
 
-1. Go to https://supabase.com/ and create a new project.
-2. Once created, go to **Project Settings** (gear icon at the bottom left).
-3. In **Project Settings**, look for the sections under **Configuration** / **API**.
-4. Copy the following values:
-   - Under **Data API**, copy the `URL`. This is your `SUPABASE_URL`.
-   - Under **API keys**, you will see `anon` and `service_role`.
-   - Copy the `service_role` key. This is your `SUPABASE_SERVICE_ROLE_KEY` (click **Reveal** to see it).
+**Where:**
+- **Left Sidebar** → `Websites & Domains`
+- Click `api.yourdomain.com`
+- **Main Area** → `Node.js`
 
-Keep these values private. **Do not commit them to GitHub.**
+Set:
+- Node version: `20.x`
+- Application mode: `production`
+- Application root: repo root folder
+- Startup file: `backend/index.js`
 
-### 5.1 Backend Environment
-
-1. In File Manager, navigate to `backend`
-2. Create new file: `.env`
-3. Add the following configuration:
+Then in same Node.js page:
+- Open `Environment Variables`
+- Add:
 
 ```env
-# Database Configuration
-DATABASE_URL=postgresql://botdash_user:your_database_password@localhost:5432/botdash
-
-# Telegram Bot Configuration
-BOT_TOKEN=your_telegram_bot_token_from_botfather
-BOT_USERNAME=your_bot_username_without_at
-DISABLE_TELEGRAM_AUTH=false
-
-# Admin Panel Login
+DATABASE_URL=postgresql://botdash_user:YOUR_DB_PASSWORD@localhost:5432/botdash
+BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+BOT_USERNAME=YOUR_BOT_USERNAME
 DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=your_secure_admin_password
-ADMIN_JWT_SECRET=your_very_long_random_secret_key_here
-
-# Supabase Configuration (for file uploads)
-# From Supabase Project Settings -> API
-SUPABASE_URL=
-# From Supabase Project Settings -> API keys -> service_role
-SUPABASE_SERVICE_ROLE_KEY=
-
-# Server Configuration
+DEFAULT_ADMIN_PASSWORD=CHANGE_ME_STRONG
+ADMIN_JWT_SECRET=VERY_LONG_RANDOM_SECRET
 NODE_ENV=production
-PORT=3000
+PORT=3001
+DISABLE_TELEGRAM_AUTH=false
 ```
 
-### 5.2 Frontend Environment
+---
 
-1. In File Manager, navigate to `admin-panel`
-2. Create new file: `.env.local`
-3. Add:
+## Step 6: Configure frontend Node.js app (app subdomain)
+
+**Where:**
+- **Left Sidebar** → `Websites & Domains`
+- Click `app.yourdomain.com`
+- **Main Area** → `Node.js`
+
+Set:
+- Node version: `20.x`
+- Application mode: `production`
+- Application root: `admin-panel`
+- Startup file: `node_modules/next/dist/bin/next`
+- Application parameters: `start -p 3000`
+
+Environment variable in same page:
 
 ```env
-NEXT_PUBLIC_API_URL=https://your-domain.com/api
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 ```
 
-## 🔧 Step 6: Node.js Application Setup
+---
 
-### 6.1 Configure Node.js
+## Step 7: Install packages and build
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Node.js**
-3. Configure settings:
+Use Plesk terminal or SSH.
 
-```
-Node.js version: 20.x (or latest available)
-Application root: /httpdocs/backend
-Application startup file: index.js
-Application URL: https://your-domain.com
-Custom document root: /httpdocs/admin-panel
+### 7.1 Backend
+
+```bash
+cd backend
+npm install
+npm run migrate
 ```
 
-4. Add Environment Variables:
-   - Click **Environment variables**
-   - Add the same variables from `.env` file
+### 7.2 Frontend
 
-5. Click **OK**
-6. Click **Enable Node.js**
-
-### 6.2 Install Dependencies
-
-#### Option A: Via SSH (Recommended)
-
-1. Connect via SSH:
-   ```bash
-   ssh username@your-server-ip
-   cd /var/www/vhosts/your-domain.com/httpdocs/backend
-   npm install --production
-   cd ../admin-panel
-   npm install --production
-   npm run build
-   ```
-
-#### Option B: Via Plesk File Manager
-
-1. Open File Manager
-2. Navigate to `backend`
-3. Use Plesk's "Console" feature to run:
-   ```bash
-   npm install --production
-   ```
-
-### 6.3 Run Database Migrations
-
-1. Via SSH or Plesk Console:
-   ```bash
-   cd /var/www/vhosts/your-domain.com/httpdocs/backend
-   npm run migrate
-   ```
-
-### 6.4 Start Application
-
-1. In Node.js settings, click **Restart App**
-2. Check application status
-3. Verify no errors in logs
-
-## 🌐 Step 7: Web Server Configuration
-
-### 7.1 Configure Nginx Proxy
-
-1. Go to **Websites & Domains** → your domain
-2. Click **Apache & nginx Settings**
-3. Scroll to **Additional nginx directives**
-4. Add:
-
-```nginx
-# Frontend proxy
-location / {
-    proxy_pass http://localhost:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_cache_bypass $http_upgrade;
-}
-
-# Backend API proxy
-location /api {
-    proxy_pass http://localhost:3001;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_cache_bypass $http_upgrade;
-}
+```bash
+cd admin-panel
+npm install
+npm run build
 ```
 
-5. Click **OK**
-6. Click **Apply**
+---
 
-## 🔒 Step 8: SSL Certificate Setup
+## Step 8: Restart both apps
 
-### 8.1 Install Let's Encrypt Certificate
+### 8.1 Restart API app
 
-1. Go to **Websites & Domains** → your domain
-2. Click **SSL/TLS Certificates**
-3. Click **Add SSL Certificate**
-4. Choose **Let's Encrypt**
-5. Configure:
-   - Check **Secure the domain with a free Let's Encrypt certificate**
-   - Check **Issue a wildcard certificate**
-   - Enter your email address
-6. Click **Get it Free**
-7. Wait for certificate issuance
+**Where:**
+- `Websites & Domains` → `api.yourdomain.com` → `Node.js`
+- **Top-right** button: `Restart App`
 
-### 8.2 Enable HTTPS
+### 8.2 Restart APP app
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Hosting Settings**
-3. Under **Security**:
-   - Check **SSL/TLS support**
-   - Select your SSL certificate
-   - Check **Permanent SEO-safe 301 redirect**
-4. Click **OK**
+**Where:**
+- `Websites & Domains` → `app.yourdomain.com` → `Node.js`
+- **Top-right** button: `Restart App`
 
-## 🧪 Step 9: Testing and Verification
+---
 
-### 9.1 Test Backend
+## Step 9: SSL (HTTPS)
 
-1. Open browser: `https://your-domain.com/api/health`
-2. Should return: `{"status":"OK",...}`
+Do this for both `app` and `api`.
 
-### 9.2 Test Frontend
+**Where:**
+- `Websites & Domains` → choose subdomain
+- **Main Area** → `SSL/TLS Certificates`
 
-1. Open browser: `https://your-domain.com`
-2. Should see admin panel login page
-3. Test login with your configured credentials
+Do:
+1. Issue Let’s Encrypt certificate
+2. Enable HTTPS redirect in Hosting Settings
 
-### 9.3 Check Logs
+---
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Logs**
-3. Check for any errors
-4. Monitor Node.js application logs
+## Step 10: Test everything
 
-## 🔄 Step 10: Updates and Maintenance
+1. Open `https://app.yourdomain.com` → login page should open
+2. Open `https://api.yourdomain.com` (or any API endpoint) → API responds
+3. Login admin and test broadcast message
+4. Test image/video send from admin panel
 
-### 10.1 Update from GitHub
+---
 
-1. Go to **Git** → your repository
-2. Click **Pull Updates**
-3. Wait for updates to download
-4. Restart Node.js application
+## E) Where to find common items quickly
 
-### 10.2 Database Backups
+- **Database server engine (PostgreSQL/MySQL):**
+  - Left Sidebar → `Tools & Settings` → `Database Servers`
 
-1. Go to **Websites & Domains** → your domain
-2. Click **Scheduled Tasks**
-3. Click **Add Task**
-4. Configure:
-   - **Task type**: Run a command
-   - **Command**: `pg_dump -h localhost -U botdash_user botdash > /var/www/vhosts/your-domain.com/backups/botdash_$(date +\%Y\%m\%d_\%H\%M\%S).sql`
-   - **Run**: Daily
-   - **Time**: 02:00
-5. Click **OK**
+- **Project database/user:**
+  - Left Sidebar → `Websites & Domains` → `api.yourdomain.com` → `Databases`
 
-## 🐛 Troubleshooting
+- **Backend env vars:**
+  - Left Sidebar → `Websites & Domains` → `api.yourdomain.com` → `Node.js` → `Environment Variables`
 
-### Common Issues
+- **Frontend env vars:**
+  - Left Sidebar → `Websites & Domains` → `app.yourdomain.com` → `Node.js` → `Environment Variables`
 
-#### Application Won't Start
-1. Check Node.js logs in Plesk
-2. Verify environment variables
-3. Check database connection
-4. Ensure all dependencies are installed
+- **Git pull updates:**
+  - Left Sidebar → `Websites & Domains` → subdomain → `Git` → top-right `Pull Updates`
 
-#### Database Connection Issues
-1. Verify database credentials
-2. Test connection via Plesk Database Manager
-3. Check PostgreSQL service status
+- **Logs:**
+  - Left Sidebar → `Websites & Domains` → subdomain → `Logs`
 
-#### Permission Issues
-1. Reset file permissions via File Manager
-2. Ensure correct ownership
-3. Check Node.js process permissions
+- **File manager:**
+  - Left Sidebar → `Websites & Domains` → subdomain → `File Manager`
 
-#### Frontend Not Loading
-1. Verify build process completed
-2. Check NEXT_PUBLIC_API_URL
-3. Ensure proxy rules are correct
+---
 
-### Getting Help
+## F) Update in future (quick process)
 
-1. Check Plesk logs: **Tools & Settings** → **Log Manager**
-2. Verify all configurations match this guide
-3. Test database connectivity
-4. Check Node.js application logs
-5. Contact your hosting provider for server-level issues
+For `api` and `app`:
+1. Open subdomain → `Git` → `Pull Updates`
+2. Run installs/build again if needed:
 
-## 📚 Additional Configuration
-
-### Performance Optimization
-
-Add to nginx directives:
-```nginx
-# Enable caching
-location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-}
-
-# Enable gzip compression
-gzip on;
-gzip_vary on;
-gzip_min_length 1024;
-gzip_types text/plain text/css application/json application/javascript;
+```bash
+cd backend && npm install && npm run migrate
+cd ../admin-panel && npm install && npm run build
 ```
 
-### Security Hardening
+3. Restart both Node.js apps
 
-1. Enable firewall in Plesk
-2. Use strong passwords
-3. Regular updates
-4. Monitor access logs
-5. Set up fail2ban if available
+---
 
-## 🎉 Deployment Complete
+## G) If something is not working
 
-Your BotDash application is now deployed from GitHub to your Plesk server!
+1. Check subdomain `Logs`
+2. Check Node.js app status in `Node.js` page
+3. Confirm env vars are saved in correct subdomain
+4. Confirm DB credentials in `DATABASE_URL`
+5. Confirm `NEXT_PUBLIC_API_URL` points to `https://api.yourdomain.com`
 
-### Final Checklist
+---
 
-- [ ] Backend running and accessible
-- [ ] Frontend loading correctly
-- [ ] Database migrations applied
-- [ ] SSL certificate installed
-- [ ] Login functionality working
-- [ ] Backup schedule configured
-- [ ] Monitoring enabled
-
+Deployment is complete when:
+- `app.yourdomain.com` opens admin panel
+- `api.yourdomain.com` backend is running
+- login works
+- Telegram text + media sending works
