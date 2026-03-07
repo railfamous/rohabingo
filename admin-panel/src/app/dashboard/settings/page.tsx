@@ -439,7 +439,8 @@ export default function SettingsPage() {
                               accept={b.block_type === 'image' ? 'image/*' : 'video/*'}
                               className="hidden"
                               onChange={async (e) => {
-                                const file = e.target.files?.[0];
+                                const input = e.currentTarget;
+                                const file = input.files?.[0];
                                 if (!file) return;
                                 try {
                                   setSaving(true);
@@ -453,7 +454,7 @@ export default function SettingsPage() {
                                   setMessage({ type: 'error', text: 'Upload failed' });
                                 } finally {
                                   setSaving(false);
-                                  e.currentTarget.value = '';
+                                  input.value = '';
                                 }
                               }}
                             />

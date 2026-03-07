@@ -80,8 +80,24 @@ const flowsRouter = require('./flows');
 const userRequestsRouter = require('./user-requests');
 const inboxRouter = require('./inbox');
 const moderationRouter = require('./moderation');
-const aiRouter = require('./ai');
 const websiteMonitorsRouter = require('./website-monitors');
+
+let aiRouter = null;
+try {
+  aiRouter = require('./ai');
+} catch (error) {
+  const isMissingLocalAiModule =
+    error &&
+    error.code === 'MODULE_NOT_FOUND' &&
+    typeof error.message === 'string' &&
+    error.message.includes("'./ai'");
+
+  if (!isMissingLocalAiModule) {
+    throw error;
+  }
+
+  console.warn('[admin/routes] Optional AI routes module not found at ./ai, skipping /ai endpoints');
+}
 
 // Use sub-routers
 router.use('/affiliate-tasks', affiliateTasksRouter);
@@ -92,9 +108,51 @@ router.use('/flows', flowsRouter);
 router.use('/user-requests', userRequestsRouter); // Admin inbox for user requests
 router.use('/inbox', inboxRouter); // Full conversation inbox
 router.use('/moderation', moderationRouter); // Group/Channel management
-router.use('/ai', aiRouter); // AI text generation
+if (aiRouter) {
+  router.use('/ai', aiRouter); // AI text generation
+}
 router.use('/website-monitors', websiteMonitorsRouter); // Website auto-post monitors
 // router.use('/', activityLogsModule.router); // Activity logs routes removed
+
+const LOCAL_MEDIA_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+const resolveLocalMediaInput = (mediaUrl) => {
+  if (typeof mediaUrl !== 'string' || mediaUrl.trim().length === 0) {
+    return mediaUrl;
+  }
+
+  let pathname = null;
+  try {
+    const parsed = new URL(mediaUrl);
+    if (!LOCAL_MEDIA_HOSTS.has(parsed.hostname)) {
+      return mediaUrl;
+    }
+    pathname = parsed.pathname;
+  } catch {
+    if (mediaUrl.startsWith('/uploads/')) {
+      pathname = mediaUrl;
+    } else {
+      return mediaUrl;
+    }
+  }
+
+  if (!pathname || !pathname.startsWith('/uploads/')) {
+    return mediaUrl;
+  }
+
+  const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
+  const resolvedPath = path.resolve(__dirname, '..', `.${pathname}`);
+
+  if (!resolvedPath.startsWith(uploadsRoot)) {
+    return mediaUrl;
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
+    return mediaUrl;
+  }
+
+  return fs.createReadStream(resolvedPath);
+};
 
 // Helper: send message/photo/video to a single user
 const sendBotBroadcast = async (userId, payload) => {
@@ -112,10 +170,12 @@ const sendBotBroadcast = async (userId, payload) => {
       media_type
     } = payload;
 
+    const mediaInput = resolveLocalMediaInput(media_url);
+
     // Media optional
     if (media_url && media_type) {
       if (media_type === 'photo') {
-        await bot.bot.sendPhoto(userId, media_url, {
+        await bot.bot.sendPhoto(userId, mediaInput, {
           caption: message || undefined,
           parse_mode
         });
@@ -123,7 +183,7 @@ const sendBotBroadcast = async (userId, payload) => {
       }
 
       if (media_type === 'video') {
-        await bot.bot.sendVideo(userId, media_url, {
+        await bot.bot.sendVideo(userId, mediaInput, {
           caption: message || undefined,
           parse_mode
         });
@@ -139,7 +199,8 @@ const sendBotBroadcast = async (userId, payload) => {
     await bot.bot.sendMessage(userId, message, { parse_mode });
     return true;
   } catch (error) {
-    console.error('Error sending broadcast message:', error);
+    const details = error?.response?.body || error?.message || error;
+    console.error('Error sending broadcast message:', details);
     return false;
   }
 };
@@ -552,6 +613,25 @@ router.post('/logout', adminAuth, async (req, res) => {
     res.json({ message: 'Logout successful' });
   } catch (error) {
     console.error('Admin logout error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get current admin user's permissions
+router.get('/users/me/permissions', adminAuth, async (req, res) => {
+  try {
+    const rolePermissions = req.admin?.role?.permissions || {};
+    const isSuperAdmin = !!req.admin?.is_legacy || rolePermissions.all === true;
+
+    const permissions = isSuperAdmin
+      ? ['*']
+      : Object.entries(rolePermissions)
+          .filter(([, value]) => value === true)
+          .map(([key]) => key);
+
+    res.json({ permissions });
+  } catch (error) {
+    console.error('Error fetching current admin permissions:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

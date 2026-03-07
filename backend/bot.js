@@ -1,8 +1,49 @@
 const TelegramBotApi = require('node-telegram-bot-api');
+const fs = require('fs');
 const path = require('path');
 const { logger } = require('./config/logger');
 const pool = require('./config/database'); // shared DB pool (used by /start welcome_message lookup, etc.)
 const { DbFlowEngine } = require('./flow/db-flow-engine');
+
+const LOCAL_MEDIA_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function resolveLocalMediaInput(mediaUrl) {
+  if (typeof mediaUrl !== 'string' || mediaUrl.trim().length === 0) {
+    return mediaUrl;
+  }
+
+  let pathname = null;
+  try {
+    const parsed = new URL(mediaUrl);
+    if (!LOCAL_MEDIA_HOSTS.has(parsed.hostname)) {
+      return mediaUrl;
+    }
+    pathname = parsed.pathname;
+  } catch {
+    if (mediaUrl.startsWith('/uploads/')) {
+      pathname = mediaUrl;
+    } else {
+      return mediaUrl;
+    }
+  }
+
+  if (!pathname || !pathname.startsWith('/uploads/')) {
+    return mediaUrl;
+  }
+
+  const uploadsRoot = path.resolve(__dirname, 'uploads');
+  const resolvedPath = path.resolve(__dirname, `.${pathname}`);
+
+  if (!resolvedPath.startsWith(uploadsRoot)) {
+    return mediaUrl;
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
+    return mediaUrl;
+  }
+
+  return fs.createReadStream(resolvedPath);
+}
 
 class TelegramBot {
   constructor(botToken) {
@@ -1430,13 +1471,13 @@ class TelegramBot {
                 const url = String(payload.url || '').trim();
                 const caption = String(payload.caption || '').trim();
                 if (url) {
-                  await this.humanSendPhoto(msg.chat.id, url, caption ? { caption, parse_mode: 'HTML' } : undefined);
+                  await this.humanSendPhoto(msg.chat.id, resolveLocalMediaInput(url), caption ? { caption, parse_mode: 'HTML' } : undefined);
                 }
               } else if (type === 'video') {
                 const url = String(payload.url || '').trim();
                 const caption = String(payload.caption || '').trim();
                 if (url) {
-                  await this.humanSendVideo(msg.chat.id, url, caption ? { caption, parse_mode: 'HTML' } : undefined);
+                  await this.humanSendVideo(msg.chat.id, resolveLocalMediaInput(url), caption ? { caption, parse_mode: 'HTML' } : undefined);
                 }
               } else if (type === 'question_flow') {
                 // Delay flow start until after other welcome blocks are sent.
